@@ -4,6 +4,7 @@ const router = express.Router();
 
 const User = require("../models/user");
 const Owner = require("../models/owner");
+const { isValidAadhaar } = require("../utils/verhoeff");
 
 router.post("/register", async (req, res) => {
   try {
@@ -12,6 +13,10 @@ router.post("/register", async (req, res) => {
 
     if (!email || !password || !name || !phone) {
       return res.status(400).json({ message: "All fields are required" });
+    }
+
+    if (!isValidAadhaar(String(aadharNumber || ""))) {
+      return res.status(400).json({ message: "Invalid Aadhaar number" });
     }
 
     const existingUser = await User.findOne({ email });
@@ -25,6 +30,9 @@ router.post("/register", async (req, res) => {
       email,
       passwordHash,
       role: "owner",
+      // Owner registration already performs Aadhaar validation and sets the Owner
+      // record as verified. Mark email as verified to avoid blocking login.
+      isEmailVerified: true,
     });
 
     await Owner.create({

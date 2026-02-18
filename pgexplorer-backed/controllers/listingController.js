@@ -35,6 +35,7 @@ exports.addPG = async (req, res) => {
 
     const pg = await PG.create({
       ownerId: req.user._id,
+      status: "pending",
       name: title, // title → name
       city,
       rent,

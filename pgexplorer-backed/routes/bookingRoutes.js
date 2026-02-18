@@ -6,6 +6,8 @@ const {
   getOwnerBookings,
   updateBookingStatus,
   getStudentBookings,
+  getStudentBookingById,
+  cancelStudentBooking,
 } = require("../controllers/bookingController");
 
 const protect = require("../middleware/authMiddleware");
@@ -21,6 +23,22 @@ router.post(
 
 // Student → View Bookings
 router.get("/student", protect, authorize("student"), getStudentBookings);
+
+// Student → View One Booking (Summary)
+router.get(
+  "/student/:bookingId",
+  protect,
+  authorize("student"),
+  getStudentBookingById,
+);
+
+// Student → Cancel Booking (keeps history by marking cancelled)
+router.delete(
+  "/:bookingId",
+  protect,
+  authorize("student"),
+  cancelStudentBooking,
+);
 
 // Owner → View Bookings
 router.get("/owner", protect, authorize("owner"), getOwnerBookings);

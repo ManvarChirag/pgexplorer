@@ -13,7 +13,6 @@ const authMiddleware = async (req, res, next) => {
 
     // 2. Extract token
     const token = authHeader.split(" ")[1];
-    console.log("AUTH HEADER RECEIVED:", req.headers.authorization);
     // 3. Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
@@ -22,6 +21,10 @@ const authMiddleware = async (req, res, next) => {
 
     if (!req.user) {
       return res.status(401).json({ message: "Invalid token" });
+    }
+
+    if (req.user.isBlocked) {
+      return res.status(403).json({ message: "User is blocked" });
     }
 
     next();

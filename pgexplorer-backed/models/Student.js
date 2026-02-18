@@ -27,6 +27,14 @@ const studentSchema = new mongoose.Schema(
       min: 1,
       max: 5,
     },
+
+    // Favorites stored per account (student)
+    favoritePgIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "PG",
+      },
+    ],
   },
   { timestamps: true },
 );
