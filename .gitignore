@@ -1,3 +1,8 @@
 # Monorepo ignores
 **/node_modules/
 **/.expo/
+
+# Local-only / secrets
+**/.env
+**/.env.*
+.vs/
