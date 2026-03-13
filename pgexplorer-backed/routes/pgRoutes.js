@@ -63,6 +63,22 @@ const parseAmenities = (value) => {
     .filter(Boolean);
 };
 
+const getPublicBaseUrl = (req) => {
+  const configured = String(process.env.BACKEND_PUBLIC_URL || "").trim();
+  if (configured) return configured.replace(/\/+$/, "");
+
+  const forwardedProto = String(req.get("x-forwarded-proto") || "")
+    .split(",")[0]
+    ?.trim();
+  const forwardedHost = String(req.get("x-forwarded-host") || "")
+    .split(",")[0]
+    ?.trim();
+
+  const proto = forwardedProto || req.protocol;
+  const host = forwardedHost || req.get("host");
+  return `${proto}://${host}`;
+};
+
 const toBool = (value) => {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return value === 1;
@@ -79,117 +95,124 @@ router.post(
   ]),
   async (req, res) => {
     try {
-    const owner = await Owner.findOne({ userId: req.user._id });
-    if (!owner) {
-      return res.status(403).json({ message: "Only owners can add PG" });
-    }
-
-    const { name, city, rent } = req.body;
-    if (!name || !city || !rent) {
-      return res
-        .status(400)
-        .json({ message: "name, city and rent are required" });
-    }
-
-    const imageFiles = Array.isArray(req.files?.images) ? req.files.images : [];
-    const paperFile = Array.isArray(req.files?.propertyPaper)
-      ? req.files.propertyPaper[0]
-      : null;
-
-    if (!imageFiles || imageFiles.length < 1) {
-      return res.status(400).json({ message: "At least 1 image is required" });
-    }
-
-    if (!paperFile) {
-      return res
-        .status(400)
-        .json({ message: "PG property paper is required" });
-    }
-
-    const images = [];
-    const cloudEnabled = isCloudinaryConfigured();
-    for (const file of imageFiles) {
-      if (cloudEnabled) {
-        const result = await cloudinary.uploader.upload(file.path, {
-          folder: "pgexplorer/pgs",
-        });
-        images.push({ url: result.secure_url, public_id: result.public_id });
-      } else {
-        // Local fallback: file is saved under /uploads by multer
-        images.push({
-          url: `${req.protocol}://${req.get("host")}/uploads/${file.filename}`,
-          public_id: `local:${file.filename}`,
-        });
+      const owner = await Owner.findOne({ userId: req.user._id });
+      if (!owner) {
+        return res.status(403).json({ message: "Only owners can add PG" });
       }
-    }
 
-    let propertyPaper;
-    if (cloudEnabled) {
-      const result = await cloudinary.uploader.upload(paperFile.path, {
-        folder: "pgexplorer/property-papers",
-        resource_type: "auto",
+      const { name, city, rent } = req.body;
+      if (!name || !city || !rent) {
+        return res
+          .status(400)
+          .json({ message: "name, city and rent are required" });
+      }
+
+      const imageFiles = Array.isArray(req.files?.images)
+        ? req.files.images
+        : [];
+      const paperFile = Array.isArray(req.files?.propertyPaper)
+        ? req.files.propertyPaper[0]
+        : null;
+
+      if (!imageFiles || imageFiles.length < 1) {
+        return res
+          .status(400)
+          .json({ message: "At least 1 image is required" });
+      }
+
+      if (!paperFile) {
+        return res
+          .status(400)
+          .json({ message: "PG property paper is required" });
+      }
+
+      const images = [];
+      const cloudEnabled = isCloudinaryConfigured();
+      for (const file of imageFiles) {
+        if (cloudEnabled) {
+          const result = await cloudinary.uploader.upload(file.path, {
+            folder: "pgexplorer/pgs",
+          });
+          images.push({ url: result.secure_url, public_id: result.public_id });
+        } else {
+          // Local fallback: file is saved under /uploads by multer
+          const base = getPublicBaseUrl(req);
+          images.push({
+            url: `${base}/uploads/${file.filename}`,
+            public_id: `local:${file.filename}`,
+          });
+        }
+      }
+
+      let propertyPaper;
+      if (cloudEnabled) {
+        const result = await cloudinary.uploader.upload(paperFile.path, {
+          folder: "pgexplorer/property-papers",
+          resource_type: "auto",
+        });
+        propertyPaper = {
+          url: result.secure_url,
+          public_id: result.public_id,
+          originalName: paperFile.originalname,
+          mimeType: paperFile.mimetype,
+        };
+      } else {
+        const base = getPublicBaseUrl(req);
+        propertyPaper = {
+          url: `${base}/uploads/${paperFile.filename}`,
+          public_id: `local:${paperFile.filename}`,
+          originalName: paperFile.originalname,
+          mimeType: paperFile.mimetype,
+        };
+      }
+
+      const roomType = req.body.roomType
+        ? normalizeRoomType(req.body.roomType)
+        : "single";
+      if (roomType && !ALLOWED_ROOM_TYPES.has(roomType)) {
+        return res
+          .status(400)
+          .json({ message: "Room type must be single or shared" });
+      }
+
+      const totalRooms = toNonNegativeInt(req.body.totalRooms);
+      const availableRooms = toNonNegativeInt(req.body.availableRooms);
+      const roomErr = validateRoomCounts({ totalRooms, availableRooms });
+      if (roomErr) {
+        return res.status(400).json({ message: roomErr });
+      }
+
+      const pg = await PG.create({
+        // Store the User id for ownership checks (matches PG model definition)
+        ownerId: req.user._id,
+        status: "pending",
+        name: String(req.body.name),
+        city: String(req.body.city),
+        rent: toNumberOrZero(req.body.rent),
+        gender: req.body.gender ? String(req.body.gender) : undefined,
+        roomType,
+        ac:
+          String(req.body.ac).toLowerCase() === "true" ||
+          String(req.body.ac) === "1",
+        deposit: toNumberOrZero(req.body.deposit),
+        maintenance: toNumberOrZero(req.body.maintenance),
+        address: req.body.address ? String(req.body.address) : "",
+        description: req.body.description ? String(req.body.description) : "",
+        rules: req.body.rules ? String(req.body.rules) : "",
+        totalRooms,
+        availableRooms,
+        amenities: parseAmenities(req.body.amenities),
+        images,
+        propertyPaper,
       });
-      propertyPaper = {
-        url: result.secure_url,
-        public_id: result.public_id,
-        originalName: paperFile.originalname,
-        mimeType: paperFile.mimetype,
-      };
-    } else {
-      propertyPaper = {
-        url: `${req.protocol}://${req.get("host")}/uploads/${paperFile.filename}`,
-        public_id: `local:${paperFile.filename}`,
-        originalName: paperFile.originalname,
-        mimeType: paperFile.mimetype,
-      };
-    }
-
-    const roomType = req.body.roomType
-      ? normalizeRoomType(req.body.roomType)
-      : "single";
-    if (roomType && !ALLOWED_ROOM_TYPES.has(roomType)) {
-      return res
-        .status(400)
-        .json({ message: "Room type must be single or shared" });
-    }
-
-    const totalRooms = toNonNegativeInt(req.body.totalRooms);
-    const availableRooms = toNonNegativeInt(req.body.availableRooms);
-    const roomErr = validateRoomCounts({ totalRooms, availableRooms });
-    if (roomErr) {
-      return res.status(400).json({ message: roomErr });
-    }
-
-    const pg = await PG.create({
-      // Store the User id for ownership checks (matches PG model definition)
-      ownerId: req.user._id,
-      status: "pending",
-      name: String(req.body.name),
-      city: String(req.body.city),
-      rent: toNumberOrZero(req.body.rent),
-      gender: req.body.gender ? String(req.body.gender) : undefined,
-      roomType,
-      ac:
-        String(req.body.ac).toLowerCase() === "true" ||
-        String(req.body.ac) === "1",
-      deposit: toNumberOrZero(req.body.deposit),
-      maintenance: toNumberOrZero(req.body.maintenance),
-      address: req.body.address ? String(req.body.address) : "",
-      description: req.body.description ? String(req.body.description) : "",
-      rules: req.body.rules ? String(req.body.rules) : "",
-      totalRooms,
-      availableRooms,
-      amenities: parseAmenities(req.body.amenities),
-      images,
-      propertyPaper,
-    });
 
       res.status(201).json(pg);
     } catch (err) {
       console.error("ADD PG ERROR:", err);
       res.status(500).json({ message: err.message || "Server error" });
     }
-});
+  },
+);
 
 // Owner: list PGs created by current owner
 router.get("/mine", auth, async (req, res) => {

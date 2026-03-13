@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../../utils/axios";
+import { resolveMediaUrl } from "../../utils/media";
 
 const MyPGs = () => {
   const [pgs, setPgs] = useState([]);
@@ -162,10 +163,23 @@ const MyPGs = () => {
             <div className="pg-kpi rounded-4 p-4 h-100">
               {pg.images?.[0]?.url && (
                 <img
-                  src={pg.images[0].url}
+                  src={resolveMediaUrl(pg.images[0].url)}
                   alt={pg.name}
                   className="w-100 rounded-3 mb-3"
                   style={{ height: 160, objectFit: "cover" }}
+                  loading="lazy"
+                  decoding="async"
+                  onError={(e) => {
+                    const el = e.currentTarget;
+                    const src = String(el?.getAttribute("src") || "");
+                    if (!src) return;
+                    if (!el.dataset?.retried && src.startsWith("http://")) {
+                      el.dataset.retried = "1";
+                      el.src = `https://${src.slice(7)}`;
+                      return;
+                    }
+                    el.style.display = "none";
+                  }}
                 />
               )}
               <div className="h5 mb-1">{pg.name}</div>

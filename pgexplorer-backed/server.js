@@ -14,6 +14,10 @@ require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const app = express();
 
+// When deployed behind a reverse proxy (common on PaaS), trust X-Forwarded-* so
+// req.protocol/req.ip are computed correctly (important for generating https asset URLs).
+app.set("trust proxy", 1);
+
 const server = http.createServer(app);
 
 // Ensure uploads folder exists (used for local image fallback)

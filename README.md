@@ -34,6 +34,19 @@ JWT_SECRET=your_jwt_secret
 PORT=5000
 FRONTEND_ORIGIN=http://localhost:3001
 
+# Optional (recommended in production): public URL of the backend.
+# Used to build stable absolute URLs for locally-served uploads when behind a proxy.
+BACKEND_PUBLIC_URL=http://localhost:5000
+
+# Email (required for verification + password reset in production)
+# In local dev, these can be omitted and links are logged to the console.
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_smtp_username
+SMTP_PASS=your_smtp_password
+SMTP_FROM="PG Explorer <no-reply@pgexplorer.com>"
+
 # Optional (for Cloudinary uploads). If not set, local /uploads is used.
 CLOUDINARY_CLOUD_NAME=xxxx
 CLOUDINARY_API_KEY=xxxx
@@ -109,3 +122,5 @@ Follow the prompts in the terminal to set email/password.
 
 - Do not commit `.env` files (already ignored in `.gitignore`).
 - If you change frontend port/origin, update `FRONTEND_ORIGIN` in backend `.env`.
+- In production, `FRONTEND_ORIGIN` must be set to your deployed frontend URL (it may be a comma-separated allowlist for CORS; the first value is used for email links).
+- In production, SMTP env vars must be set or registration/verification emails cannot be delivered.

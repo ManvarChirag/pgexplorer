@@ -6,6 +6,7 @@ import {
   getMyFavoritePgIds,
   toggleFavoritePgId,
 } from "../services/favoriteService";
+import { resolveMediaUrl } from "../utils/media";
 
 const toTitle = (str) =>
   str
@@ -106,7 +107,23 @@ const PGDetails = () => {
 
   const isFull = Number(pg.availableRooms || 0) <= 0;
 
-  const mainImage = pg.images?.[0]?.url;
+  const mainImage = resolveMediaUrl(pg.images?.[0]?.url);
+
+  const handleImageError = (e) => {
+    const el = e.currentTarget;
+    const src = String(el?.getAttribute("src") || "");
+    if (!src) return;
+
+    // Retry once: upgrade http -> https (common when backend generated http URLs behind proxies)
+    if (!el.dataset?.retried && src.startsWith("http://")) {
+      el.dataset.retried = "1";
+      el.src = `https://${src.slice(7)}`;
+      return;
+    }
+
+    // Otherwise hide broken images to keep UI clean.
+    el.style.display = "none";
+  };
 
   return (
     <div className="pg-glass rounded-4 p-4 p-md-5">
@@ -164,6 +181,9 @@ const PGDetails = () => {
           alt={pg.name}
           className="w-100 rounded-4 mb-3"
           style={{ height: 260, objectFit: "cover" }}
+          loading="lazy"
+          decoding="async"
+          onError={handleImageError}
         />
       )}
 
@@ -172,10 +192,13 @@ const PGDetails = () => {
           {pg.images.slice(1, 5).map((img) => (
             <img
               key={img.public_id || img.url}
-              src={img.url}
+              src={resolveMediaUrl(img.url)}
               alt=""
               className="rounded-3"
               style={{ width: 90, height: 70, objectFit: "cover" }}
+              loading="lazy"
+              decoding="async"
+              onError={handleImageError}
             />
           ))}
         </div>

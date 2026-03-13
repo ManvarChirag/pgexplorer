@@ -4,8 +4,15 @@ const buildTransporter = async () => {
   const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, SMTP_FROM } =
     process.env;
 
+  const isProd = process.env.NODE_ENV === "production";
+
   // Dev fallback: no SMTP configured
   if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
+    if (isProd) {
+      throw new Error(
+        "SMTP is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS (and optionally SMTP_FROM).",
+      );
+    }
     return null;
   }
 

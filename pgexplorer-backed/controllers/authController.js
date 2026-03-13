@@ -41,8 +41,25 @@ const clearRefreshCookie = (res) => {
 };
 
 const buildFrontendUrl = (path) => {
-  const base = process.env.FRONTEND_ORIGIN || "http://localhost:3000";
-  return `${base}${path}`;
+  const isProd = process.env.NODE_ENV === "production";
+  const configuredRaw = process.env.FRONTEND_ORIGIN;
+
+  const configuredBase = (configuredRaw || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)[0];
+
+  if (isProd && !configuredBase) {
+    throw new Error(
+      "FRONTEND_ORIGIN is not set. It must be your deployed frontend URL (e.g. https://pgexplorer.netlify.app).",
+    );
+  }
+
+  const base = (configuredBase || "http://localhost:3000").replace(/\/+$/, "");
+  const normalizedPath = String(path || "").startsWith("/")
+    ? String(path || "")
+    : `/${path}`;
+  return `${base}${normalizedPath}`;
 };
 
 // =====================
@@ -51,6 +68,29 @@ const buildFrontendUrl = (path) => {
 exports.registerUser = async (req, res) => {
   try {
     const { email, password, role } = req.body;
+
+    // Validate role-specific payload BEFORE creating any DB records
+    if (role === "student") {
+      const { name, college, branch, year } = req.body;
+      if (!name || !college || !branch || !year) {
+        return res.status(400).json({
+          message: "Student profile fields missing",
+        });
+      }
+    }
+
+    if (role === "owner") {
+      const { name, phone, city, address, aadharNumber } = req.body;
+      if (!name || !phone || !city || !address || !aadharNumber) {
+        return res.status(400).json({
+          message: "Owner profile fields missing",
+        });
+      }
+
+      if (!isValidAadhaar(String(aadharNumber))) {
+        return res.status(400).json({ message: "Invalid Aadhaar number" });
+      }
+    }
 
     // Block admin registration
     if (role === "admin") {
@@ -77,84 +117,107 @@ exports.registerUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // Create base User
-    const user = await User.create({
-      email,
-      passwordHash,
-      role,
-    });
+    let user;
+    try {
+      // Create base User
+      user = await User.create({
+        email,
+        passwordHash,
+        role,
+      });
 
-    // =====================
-    // CREATE ROLE PROFILE
-    // =====================
-    if (role === "student") {
-      const { name, college, branch, year } = req.body;
-
-      if (!name || !college || !branch || !year) {
-        return res.status(400).json({
-          message: "Student profile fields missing",
+      // =====================
+      // CREATE ROLE PROFILE
+      // =====================
+      if (role === "student") {
+        const { name, college, branch, year } = req.body;
+        await Student.create({
+          userId: user._id,
+          name,
+          college,
+          branch,
+          year,
         });
       }
 
-      await Student.create({
-        userId: user._id,
-        name,
-        college,
-        branch,
-        year,
-      });
-    }
-
-    if (role === "owner") {
-      const { name, phone, city, address, aadharNumber } = req.body;
-
-      if (!name || !phone || !city || !address || !aadharNumber) {
-        return res.status(400).json({
-          message: "Owner profile fields missing",
+      if (role === "owner") {
+        const { name, phone, city, address, aadharNumber } = req.body;
+        await Owner.create({
+          userId: user._id,
+          name,
+          phone,
+          city,
+          address,
+          aadharNumber,
         });
       }
 
-      if (!isValidAadhaar(String(aadharNumber))) {
-        return res.status(400).json({ message: "Invalid Aadhaar number" });
+      // Email verification (new signups only)
+      const rawVerifyToken = crypto.randomBytes(32).toString("hex");
+      user.isEmailVerified = false;
+      user.emailVerificationTokenHash = sha256(rawVerifyToken);
+      user.emailVerificationExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
+      await user.save();
+
+      const verifyUrl = buildFrontendUrl(
+        `/verify-email?token=${rawVerifyToken}`,
+      );
+      await sendEmail({
+        to: user.email,
+        subject: "Verify your email - PG Explorer",
+        text: `Verify your email by opening: ${verifyUrl}`,
+      });
+
+      res.status(201).json({
+        message: "Registration successful. Please verify your email.",
+        userId: user._id,
+        role,
+        // Dev helper so you can test without SMTP
+        ...(process.env.NODE_ENV !== "production"
+          ? { verifyTokenDevOnly: rawVerifyToken }
+          : {}),
+      });
+    } catch (innerError) {
+      // Rollback: avoid leaving an unverified account that can never be verified
+      if (user?._id) {
+        try {
+          await Promise.all([
+            Student.deleteOne({ userId: user._id }),
+            Owner.deleteOne({ userId: user._id }),
+          ]);
+        } catch {
+          // ignore cleanup failures
+        }
+
+        try {
+          await User.deleteOne({ _id: user._id });
+        } catch {
+          // ignore cleanup failures
+        }
       }
 
-      await Owner.create({
-        userId: user._id,
-        name,
-        phone,
-        city,
-        address,
-        aadharNumber,
-      });
+      throw innerError;
     }
-
-    // Email verification (new signups only)
-    const rawVerifyToken = crypto.randomBytes(32).toString("hex");
-    user.isEmailVerified = false;
-    user.emailVerificationTokenHash = sha256(rawVerifyToken);
-    user.emailVerificationExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
-    await user.save();
-
-    const verifyUrl = buildFrontendUrl(`/verify-email?token=${rawVerifyToken}`);
-    await sendEmail({
-      to: user.email,
-      subject: "Verify your email - PG Explorer",
-      text: `Verify your email by opening: ${verifyUrl}`,
-    });
-
-    res.status(201).json({
-      message: "Registration successful. Please verify your email.",
-      userId: user._id,
-      role,
-      // Dev helper so you can test without SMTP
-      ...(process.env.NODE_ENV !== "production"
-        ? { verifyTokenDevOnly: rawVerifyToken }
-        : {}),
-    });
   } catch (error) {
+    const msg = String(error?.message || "");
+    const isProd = process.env.NODE_ENV === "production";
+
+    if (isProd && msg.includes("SMTP is not configured")) {
+      return res.status(503).json({
+        message:
+          "Email service is not configured. Please try again later or contact support.",
+      });
+    }
+
+    if (isProd && msg.includes("FRONTEND_ORIGIN is not set")) {
+      return res.status(503).json({
+        message: "Server configuration error. Please try again later.",
+      });
+    }
+
     res.status(500).json({
       message: "Registration failed",
-      error: error.message,
+      ...(!isProd ? { error: error.message } : {}),
     });
   }
 };
