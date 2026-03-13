@@ -1,0 +1,17 @@
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+.env
+
+# local uploads (use a volume in production if you need persistence)
+uploads
+
+.git
+.gitignore
+
+Dockerfile
+.dockerignore
+
+*.md
