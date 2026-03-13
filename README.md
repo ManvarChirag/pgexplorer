@@ -38,8 +38,8 @@ FRONTEND_ORIGIN=http://localhost:3001
 # Used to build stable absolute URLs for locally-served uploads when behind a proxy.
 BACKEND_PUBLIC_URL=http://localhost:5000
 
-# Email (required for verification + password reset in production)
-# In local dev, these can be omitted and links are logged to the console.
+# Email (required for OTP verification + password reset in production)
+# In local dev, these can be omitted and OTP/reset links are logged to the console.
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 SMTP_SECURE=false
@@ -51,6 +51,10 @@ SMTP_FROM="PG Explorer <no-reply@pgexplorer.com>"
 # If set to false, users can register/login without email verification.
 # (Password reset will still require email sending.)
 EMAIL_VERIFICATION_REQUIRED=true
+
+# Optional OTP tuning
+OTP_MAX_ATTEMPTS=5
+OTP_RESEND_COOLDOWN_MS=60000
 
 # Optional (for Cloudinary uploads). If not set, local /uploads is used.
 CLOUDINARY_CLOUD_NAME=xxxx

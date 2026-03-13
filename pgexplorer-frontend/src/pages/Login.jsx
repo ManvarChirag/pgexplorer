@@ -45,18 +45,23 @@ const Login = () => {
   const canResend =
     String(lastError || "")
       .toLowerCase()
-      .includes("email not verified") &&
+      .includes("verify your email") &&
     String(form.email || "").trim().length > 0;
 
   const handleResend = async () => {
     try {
       const res = await resendVerificationEmail(form.email);
 
-      const devToken = res?.verifyTokenDevOnly;
-      if (devToken) {
-        navigate(`/verify-email?token=${encodeURIComponent(devToken)}`);
-        return;
+      const devOtp = res?.otpDevOnly;
+      if (devOtp) {
+        pushToast({
+          type: "info",
+          title: "Dev OTP",
+          message: `Your code is: ${devOtp}`,
+        });
       }
+
+      navigate(`/verify-email?email=${encodeURIComponent(form.email)}`);
 
       pushToast({
         type: "success",

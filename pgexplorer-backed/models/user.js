@@ -32,6 +32,21 @@ const userSchema = new mongoose.Schema(
       type: Date,
     },
 
+    // Email OTP verification (6-digit code)
+    emailOtpHash: {
+      type: String,
+    },
+    emailOtpExpiresAt: {
+      type: Date,
+    },
+    emailOtpAttempts: {
+      type: Number,
+      default: 0,
+    },
+    emailOtpLastSentAt: {
+      type: Date,
+    },
+
     refreshTokenHash: {
       type: String,
     },

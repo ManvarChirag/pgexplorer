@@ -13,6 +13,15 @@ const REFRESH_TOKEN_DAYS = Number(process.env.REFRESH_TOKEN_DAYS || 30);
 const sha256 = (value) =>
   crypto.createHash("sha256").update(value).digest("hex");
 
+const generateOtp6 = () =>
+  String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
+
+const OTP_TTL_MS = 10 * 60 * 1000;
+const OTP_MAX_ATTEMPTS = Number(process.env.OTP_MAX_ATTEMPTS || 5);
+const OTP_RESEND_COOLDOWN_MS = Number(
+  process.env.OTP_RESEND_COOLDOWN_MS || 60_000,
+);
+
 const signAccessToken = (user) =>
   jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
     expiresIn: ACCESS_TOKEN_TTL,
@@ -167,6 +176,10 @@ exports.registerUser = async (req, res) => {
         user.isEmailVerified = true;
         user.emailVerificationTokenHash = undefined;
         user.emailVerificationExpiresAt = undefined;
+        user.emailOtpHash = undefined;
+        user.emailOtpExpiresAt = undefined;
+        user.emailOtpAttempts = 0;
+        user.emailOtpLastSentAt = undefined;
         await user.save();
 
         return res.status(201).json({
@@ -176,20 +189,23 @@ exports.registerUser = async (req, res) => {
         });
       }
 
-      // Email verification (new signups only)
-      const rawVerifyToken = crypto.randomBytes(32).toString("hex");
+      // Email OTP verification (new signups)
+      const otp = generateOtp6();
       user.isEmailVerified = false;
-      user.emailVerificationTokenHash = sha256(rawVerifyToken);
-      user.emailVerificationExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
+      user.emailOtpHash = sha256(otp);
+      user.emailOtpExpiresAt = new Date(Date.now() + OTP_TTL_MS);
+      user.emailOtpAttempts = 0;
+      user.emailOtpLastSentAt = new Date();
+
+      // Keep old token fields cleared (backward compatible endpoint still exists)
+      user.emailVerificationTokenHash = undefined;
+      user.emailVerificationExpiresAt = undefined;
       await user.save();
 
-      const verifyUrl = buildFrontendUrl(
-        `/verify-email?token=${rawVerifyToken}`,
-      );
       await sendEmail({
         to: user.email,
-        subject: "Verify your email - PG Explorer",
-        text: `Verify your email by opening: ${verifyUrl}`,
+        subject: "Your PG Explorer verification code",
+        text: `Your verification code is: ${otp}. This code will expire in 10 minutes.`,
       });
 
       res.status(201).json({
@@ -197,9 +213,7 @@ exports.registerUser = async (req, res) => {
         userId: user._id,
         role,
         // Dev helper so you can test without SMTP
-        ...(process.env.NODE_ENV !== "production"
-          ? { verifyTokenDevOnly: rawVerifyToken }
-          : {}),
+        ...(process.env.NODE_ENV !== "production" ? { otpDevOnly: otp } : {}),
       });
     } catch (innerError) {
       // Rollback: avoid leaving an unverified account that can never be verified
@@ -281,7 +295,7 @@ exports.loginUser = async (req, res) => {
       user.isEmailVerified === false
     ) {
       return res.status(403).json({
-        message: "Email not verified. Please verify your email.",
+        message: "Please verify your email before logging in.",
       });
     }
 
@@ -314,27 +328,86 @@ exports.loginUser = async (req, res) => {
 // =====================
 exports.verifyEmail = async (req, res) => {
   try {
-    const { token } = req.body;
-    if (!token) {
-      return res.status(400).json({ message: "Verification token required" });
+    const { token, email, otp } = req.body || {};
+
+    // Backward-compatible: support old token-based verification links
+    if (token) {
+      const tokenHash = sha256(token);
+      const user = await User.findOne({
+        emailVerificationTokenHash: tokenHash,
+        emailVerificationExpiresAt: { $gt: new Date() },
+      });
+
+      if (!user) {
+        return res.status(400).json({ message: "Invalid or expired token" });
+      }
+
+      user.isEmailVerified = true;
+      user.emailVerificationTokenHash = undefined;
+      user.emailVerificationExpiresAt = undefined;
+      user.emailOtpHash = undefined;
+      user.emailOtpExpiresAt = undefined;
+      user.emailOtpAttempts = 0;
+      user.emailOtpLastSentAt = undefined;
+      await user.save();
+
+      return res.json({ message: "Email verified successfully." });
     }
 
-    const tokenHash = sha256(token);
-    const user = await User.findOne({
-      emailVerificationTokenHash: tokenHash,
-      emailVerificationExpiresAt: { $gt: new Date() },
-    });
+    // OTP verification
+    const cleanEmail = String(email || "")
+      .trim()
+      .toLowerCase();
+    const cleanOtp = String(otp || "").trim();
 
-    if (!user) {
-      return res.status(400).json({ message: "Invalid or expired token" });
+    if (!cleanEmail || !cleanOtp) {
+      return res
+        .status(400)
+        .json({ message: "Email and verification code are required." });
+    }
+
+    const user = await User.findOne({ email: cleanEmail });
+    if (!user || user.role === "admin") {
+      return res.status(400).json({ message: "Invalid verification code." });
+    }
+
+    if (user.isEmailVerified === true) {
+      return res.json({ message: "Email verified successfully." });
+    }
+
+    if (!user.emailOtpHash || !user.emailOtpExpiresAt) {
+      return res.status(400).json({
+        message: "Verification code expired. Please request a new one.",
+      });
+    }
+
+    if (new Date(user.emailOtpExpiresAt).getTime() < Date.now()) {
+      return res.status(400).json({
+        message: "Verification code expired. Please request a new one.",
+      });
+    }
+
+    if (Number(user.emailOtpAttempts || 0) >= OTP_MAX_ATTEMPTS) {
+      return res.status(429).json({
+        message: "Too many attempts. Please request a new one.",
+      });
+    }
+
+    const matches = sha256(cleanOtp) === user.emailOtpHash;
+    if (!matches) {
+      user.emailOtpAttempts = Number(user.emailOtpAttempts || 0) + 1;
+      await user.save();
+      return res.status(400).json({ message: "Invalid verification code." });
     }
 
     user.isEmailVerified = true;
-    user.emailVerificationTokenHash = undefined;
-    user.emailVerificationExpiresAt = undefined;
+    user.emailOtpHash = undefined;
+    user.emailOtpExpiresAt = undefined;
+    user.emailOtpAttempts = 0;
+    user.emailOtpLastSentAt = undefined;
     await user.save();
 
-    res.json({ message: "Email verified successfully" });
+    return res.json({ message: "Email verified successfully." });
   } catch (error) {
     res.status(500).json({ message: "Verification failed" });
   }
@@ -351,12 +424,13 @@ exports.resendVerificationEmail = async (req, res) => {
       return res.status(400).json({ message: "Email required" });
     }
 
-    const user = await User.findOne({ email });
+    const cleanEmail = String(email).trim().toLowerCase();
+    const user = await User.findOne({ email: cleanEmail });
 
     // Do not reveal account existence
     if (!user || user.role === "admin") {
       return res.json({
-        message: "If the email exists, a verification link was sent",
+        message: "If the email exists, a verification code was sent",
       });
     }
 
@@ -369,28 +443,44 @@ exports.resendVerificationEmail = async (req, res) => {
       user.isEmailVerified = true;
       user.emailVerificationTokenHash = undefined;
       user.emailVerificationExpiresAt = undefined;
+      user.emailOtpHash = undefined;
+      user.emailOtpExpiresAt = undefined;
+      user.emailOtpAttempts = 0;
+      user.emailOtpLastSentAt = undefined;
       await user.save();
       return res.json({ message: "Email verification is not required" });
     }
 
-    const rawVerifyToken = crypto.randomBytes(32).toString("hex");
+    const lastSentAt = user.emailOtpLastSentAt
+      ? new Date(user.emailOtpLastSentAt).getTime()
+      : 0;
+    if (Date.now() - lastSentAt < OTP_RESEND_COOLDOWN_MS) {
+      return res.status(429).json({
+        message: "Please wait before requesting a new code.",
+      });
+    }
+
+    const otp = generateOtp6();
     user.isEmailVerified = false;
-    user.emailVerificationTokenHash = sha256(rawVerifyToken);
-    user.emailVerificationExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
+    user.emailOtpHash = sha256(otp);
+    user.emailOtpExpiresAt = new Date(Date.now() + OTP_TTL_MS);
+    user.emailOtpAttempts = 0;
+    user.emailOtpLastSentAt = new Date();
+
+    // Clear legacy token fields
+    user.emailVerificationTokenHash = undefined;
+    user.emailVerificationExpiresAt = undefined;
     await user.save();
 
-    const verifyUrl = buildFrontendUrl(`/verify-email?token=${rawVerifyToken}`);
     await sendEmail({
       to: user.email,
-      subject: "Verify your email - PG Explorer",
-      text: `Verify your email by opening: ${verifyUrl}`,
+      subject: "Your PG Explorer verification code",
+      text: `Your verification code is: ${otp}. This code will expire in 10 minutes.`,
     });
 
     return res.json({
-      message: "If the email exists, a verification link was sent",
-      ...(process.env.NODE_ENV !== "production"
-        ? { verifyTokenDevOnly: rawVerifyToken }
-        : {}),
+      message: "If the email exists, a verification code was sent",
+      ...(process.env.NODE_ENV !== "production" ? { otpDevOnly: otp } : {}),
     });
   } catch (error) {
     const msg = String(error?.message || "");
