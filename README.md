@@ -47,6 +47,13 @@ SMTP_USER=your_smtp_username
 SMTP_PASS=your_smtp_password
 SMTP_FROM="PG Explorer <no-reply@pgexplorer.com>"
 
+# Some hosts (including Render) may block outbound SMTP ports (587/465/25),
+# causing timeouts. In that case, configure Brevo API (HTTPS) as a fallback:
+# - Create an API key in Brevo
+# - Set EMAIL_PROVIDER=brevo (or leave unset to use SMTP then fallback)
+BREVO_API_KEY=your_brevo_api_key
+EMAIL_PROVIDER=brevo
+
 # Optional: disable email verification for demo/staging environments.
 # If set to false, users can register/login without email verification.
 # (Password reset will still require email sending.)

@@ -277,7 +277,9 @@ exports.registerUser = async (req, res) => {
       isProd &&
       (msg.includes("SMTP is not configured") ||
         msg.includes("SMTP verify failed") ||
-        msg.includes("SMTP send failed"))
+        msg.includes("SMTP send failed") ||
+        msg.includes("BREVO send failed") ||
+        msg.includes("BREVO_API_KEY is not configured"))
     ) {
       // Help diagnose SMTP issues via Render logs (do not include secrets).
       console.error("[AUTH][REGISTER][SMTP_ERROR]", msg);
@@ -509,7 +511,9 @@ exports.resendVerificationEmail = async (req, res) => {
       isProd &&
       (msg.includes("SMTP is not configured") ||
         msg.includes("SMTP verify failed") ||
-        msg.includes("SMTP send failed"))
+        msg.includes("SMTP send failed") ||
+        msg.includes("BREVO send failed") ||
+        msg.includes("BREVO_API_KEY is not configured"))
     ) {
       console.error("[AUTH][RESEND_OTP][SMTP_ERROR]", msg);
       return res.status(503).json({
@@ -635,7 +639,9 @@ exports.forgotPassword = async (req, res) => {
       isProd &&
       (msg.includes("SMTP is not configured") ||
         msg.includes("SMTP verify failed") ||
-        msg.includes("SMTP send failed"))
+        msg.includes("SMTP send failed") ||
+        msg.includes("BREVO send failed") ||
+        msg.includes("BREVO_API_KEY is not configured"))
     ) {
       console.error("[AUTH][FORGOT_PASSWORD][SMTP_ERROR]", msg);
       return res.status(503).json({

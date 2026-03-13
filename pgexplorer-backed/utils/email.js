@@ -1,4 +1,80 @@
 const nodemailer = require("nodemailer");
+const https = require("https");
+
+const parseFrom = (raw) => {
+  const value = String(raw || "").trim();
+  const m = value.match(/^(.*)<([^>]+)>$/);
+  if (!m) return { name: "PG Explorer", email: value };
+  const name = m[1].trim().replace(/^"|"$/g, "") || "PG Explorer";
+  const email = m[2].trim();
+  return { name, email };
+};
+
+const sendViaBrevo = async ({ to, subject, text, html }) => {
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "BREVO_API_KEY is not configured. Set BREVO_API_KEY or configure SMTP.",
+    );
+  }
+
+  const fromRaw = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const sender = parseFrom(fromRaw);
+
+  const payload = {
+    sender,
+    to: [{ email: String(to).trim() }],
+    subject: String(subject || ""),
+    textContent: text ? String(text) : undefined,
+    htmlContent: html ? String(html) : undefined,
+  };
+
+  const body = JSON.stringify(payload);
+
+  return await new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        hostname: "api.brevo.com",
+        path: "/v3/smtp/email",
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "content-length": Buffer.byteLength(body),
+          "api-key": apiKey,
+        },
+        timeout: 20_000,
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk) => (data += chunk));
+        res.on("end", () => {
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            try {
+              const parsed = data ? JSON.parse(data) : {};
+              return resolve({ mode: "brevo", messageId: parsed.messageId });
+            } catch {
+              return resolve({ mode: "brevo" });
+            }
+          }
+
+          return reject(
+            new Error(
+              `BREVO send failed: ${res.statusCode || "?"} ${data || ""}`.trim(),
+            ),
+          );
+        });
+      },
+    );
+
+    req.on("timeout", () => {
+      req.destroy(new Error("BREVO send failed: Connection timeout"));
+    });
+
+    req.on("error", (err) => reject(err));
+    req.write(body);
+    req.end();
+  });
+};
 
 const buildTransporter = async () => {
   const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, SMTP_FROM } =
@@ -41,6 +117,13 @@ const buildTransporter = async () => {
 };
 
 const sendEmail = async ({ to, subject, text, html }) => {
+  const provider = String(process.env.EMAIL_PROVIDER || "").toLowerCase();
+
+  // Force Brevo (useful on hosts that block SMTP).
+  if (provider === "brevo") {
+    return await sendViaBrevo({ to, subject, text, html });
+  }
+
   const built = await buildTransporter();
 
   if (!built) {
@@ -59,6 +142,15 @@ const sendEmail = async ({ to, subject, text, html }) => {
       html,
     });
   } catch (err) {
+    // If SMTP is blocked on the host, fall back to Brevo API (HTTPS) when configured.
+    if (process.env.BREVO_API_KEY) {
+      try {
+        return await sendViaBrevo({ to, subject, text, html });
+      } catch (brevoErr) {
+        throw new Error(`BREVO send failed: ${brevoErr?.message || brevoErr}`);
+      }
+    }
+
     throw new Error(`SMTP send failed: ${err?.message || err}`);
   }
 
