@@ -47,6 +47,11 @@ SMTP_USER=your_smtp_username
 SMTP_PASS=your_smtp_password
 SMTP_FROM="PG Explorer <no-reply@pgexplorer.com>"
 
+# Optional: disable email verification for demo/staging environments.
+# If set to false, users can register/login without email verification.
+# (Password reset will still require email sending.)
+EMAIL_VERIFICATION_REQUIRED=true
+
 # Optional (for Cloudinary uploads). If not set, local /uploads is used.
 CLOUDINARY_CLOUD_NAME=xxxx
 CLOUDINARY_API_KEY=xxxx
@@ -124,3 +129,4 @@ Follow the prompts in the terminal to set email/password.
 - If you change frontend port/origin, update `FRONTEND_ORIGIN` in backend `.env`.
 - In production, `FRONTEND_ORIGIN` must be set to your deployed frontend URL (it may be a comma-separated allowlist for CORS; the first value is used for email links).
 - In production, SMTP env vars must be set or registration/verification emails cannot be delivered.
+- If you don't have SMTP yet (demo), set `EMAIL_VERIFICATION_REQUIRED=false` on the backend to allow registration/login without email verification.

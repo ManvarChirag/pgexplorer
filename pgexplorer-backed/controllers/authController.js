@@ -40,6 +40,15 @@ const clearRefreshCookie = (res) => {
   });
 };
 
+const isEmailVerificationRequired = () => {
+  // Default: required (especially in production).
+  // Set EMAIL_VERIFICATION_REQUIRED=false to disable for demo/staging environments.
+  return (
+    String(process.env.EMAIL_VERIFICATION_REQUIRED || "true").toLowerCase() !==
+    "false"
+  );
+};
+
 const buildFrontendUrl = (path) => {
   const isProd = process.env.NODE_ENV === "production";
   const configuredRaw = process.env.FRONTEND_ORIGIN;
@@ -149,6 +158,21 @@ exports.registerUser = async (req, res) => {
           city,
           address,
           aadharNumber,
+        });
+      }
+
+      // Optional mode (demo/staging): allow signups even when email isn't configured.
+      // NOTE: Password reset will still require email.
+      if (!isEmailVerificationRequired()) {
+        user.isEmailVerified = true;
+        user.emailVerificationTokenHash = undefined;
+        user.emailVerificationExpiresAt = undefined;
+        await user.save();
+
+        return res.status(201).json({
+          message: "Registration successful",
+          userId: user._id,
+          role,
         });
       }
 
@@ -307,6 +331,82 @@ exports.verifyEmail = async (req, res) => {
 };
 
 // =====================
+// RESEND VERIFICATION EMAIL
+// POST /api/auth/resend-verification
+// =====================
+exports.resendVerificationEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "Email required" });
+    }
+
+    const user = await User.findOne({ email });
+
+    // Do not reveal account existence
+    if (!user || user.role === "admin") {
+      return res.json({
+        message: "If the email exists, a verification link was sent",
+      });
+    }
+
+    if (user.isEmailVerified === true) {
+      return res.json({ message: "Email already verified" });
+    }
+
+    // If verification is disabled, just activate.
+    if (!isEmailVerificationRequired()) {
+      user.isEmailVerified = true;
+      user.emailVerificationTokenHash = undefined;
+      user.emailVerificationExpiresAt = undefined;
+      await user.save();
+      return res.json({ message: "Email verification is not required" });
+    }
+
+    const rawVerifyToken = crypto.randomBytes(32).toString("hex");
+    user.isEmailVerified = false;
+    user.emailVerificationTokenHash = sha256(rawVerifyToken);
+    user.emailVerificationExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
+    await user.save();
+
+    const verifyUrl = buildFrontendUrl(`/verify-email?token=${rawVerifyToken}`);
+    await sendEmail({
+      to: user.email,
+      subject: "Verify your email - PG Explorer",
+      text: `Verify your email by opening: ${verifyUrl}`,
+    });
+
+    return res.json({
+      message: "If the email exists, a verification link was sent",
+      ...(process.env.NODE_ENV !== "production"
+        ? { verifyTokenDevOnly: rawVerifyToken }
+        : {}),
+    });
+  } catch (error) {
+    const msg = String(error?.message || "");
+    const isProd = process.env.NODE_ENV === "production";
+
+    if (isProd && msg.includes("SMTP is not configured")) {
+      return res.status(503).json({
+        message:
+          "Email service is not configured. Please try again later or contact support.",
+      });
+    }
+
+    if (isProd && msg.includes("FRONTEND_ORIGIN is not set")) {
+      return res.status(503).json({
+        message: "Server configuration error. Please try again later.",
+      });
+    }
+
+    return res.status(500).json({
+      message: "Resend verification failed",
+      ...(!isProd ? { error: error.message } : {}),
+    });
+  }
+};
+
+// =====================
 // REFRESH ACCESS TOKEN
 // POST /api/auth/refresh
 // =====================
@@ -403,6 +503,16 @@ exports.forgotPassword = async (req, res) => {
         : {}),
     });
   } catch (error) {
+    const msg = String(error?.message || "");
+    const isProd = process.env.NODE_ENV === "production";
+
+    if (isProd && msg.includes("SMTP is not configured")) {
+      return res.status(503).json({
+        message:
+          "Email service is not configured. Please try again later or contact support.",
+      });
+    }
+
     res.status(500).json({ message: "Forgot password failed" });
   }
 };

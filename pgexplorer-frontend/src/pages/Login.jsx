@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { loginUser } from "../services/authService";
+import { loginUser, resendVerificationEmail } from "../services/authService";
 import { useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
@@ -13,6 +13,7 @@ const getRouteForRole = (role) => {
 
 const Login = () => {
   const [form, setForm] = useState({ email: "", password: "" });
+  const [lastError, setLastError] = useState("");
   const navigate = useNavigate();
   const { pushToast } = useToast();
 
@@ -27,6 +28,7 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      setLastError("");
       const data = await loginUser(form);
       const role = data?.role || localStorage.getItem("role");
       navigate(getRouteForRole(role), { replace: true });
@@ -35,7 +37,34 @@ const Login = () => {
         err?.response?.data?.message ||
         err?.message ||
         "Login failed. Please try again.";
+      setLastError(msg);
       pushToast({ type: "error", title: "Login failed", message: msg });
+    }
+  };
+
+  const canResend =
+    String(lastError || "")
+      .toLowerCase()
+      .includes("email not verified") &&
+    String(form.email || "").trim().length > 0;
+
+  const handleResend = async () => {
+    try {
+      const res = await resendVerificationEmail(form.email);
+      pushToast({
+        type: "success",
+        title: "Verification sent",
+        message: res?.message || "Please check your email inbox/spam.",
+      });
+    } catch (err) {
+      pushToast({
+        type: "error",
+        title: "Resend failed",
+        message:
+          err?.response?.data?.message ||
+          err?.message ||
+          "Could not resend verification email.",
+      });
     }
   };
 
@@ -82,6 +111,18 @@ const Login = () => {
                 Forgot password?
               </Link>
             </div>
+
+            {canResend && (
+              <div className="mt-2 text-center">
+                <button
+                  type="button"
+                  className="btn btn-link p-0 small"
+                  onClick={handleResend}
+                >
+                  Resend verification email
+                </button>
+              </div>
+            )}
           </form>
         </div>
       </div>

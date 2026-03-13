@@ -38,6 +38,11 @@ export const verifyEmail = async (token) => {
   return res.data;
 };
 
+export const resendVerificationEmail = async (email) => {
+  const res = await api.post("/auth/resend-verification", { email });
+  return res.data;
+};
+
 export const forgotPassword = async (email) => {
   const res = await api.post("/auth/forgot-password", { email });
   return res.data;
