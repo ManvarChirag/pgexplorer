@@ -22,6 +22,29 @@ const OTP_RESEND_COOLDOWN_MS = Number(
   process.env.OTP_RESEND_COOLDOWN_MS || 60_000,
 );
 
+const issueAndSendEmailOtp = async (user) => {
+  const otp = generateOtp6();
+  user.isEmailVerified = false;
+  user.emailOtpHash = sha256(otp);
+  user.emailOtpExpiresAt = new Date(Date.now() + OTP_TTL_MS);
+  user.emailOtpAttempts = 0;
+  user.emailOtpLastSentAt = new Date();
+
+  // Clear legacy token fields
+  user.emailVerificationTokenHash = undefined;
+  user.emailVerificationExpiresAt = undefined;
+
+  await user.save();
+
+  await sendEmail({
+    to: user.email,
+    subject: "Your PG Explorer verification code",
+    text: `Your verification code is: ${otp}. This code will expire in 10 minutes.`,
+  });
+
+  return otp;
+};
+
 const signAccessToken = (user) =>
   jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
     expiresIn: ACCESS_TOKEN_TTL,
@@ -86,6 +109,9 @@ const buildFrontendUrl = (path) => {
 exports.registerUser = async (req, res) => {
   try {
     const { email, password, role } = req.body;
+    const cleanEmail = String(email || "")
+      .trim()
+      .toLowerCase();
 
     // Validate role-specific payload BEFORE creating any DB records
     if (role === "student") {
@@ -117,15 +143,38 @@ exports.registerUser = async (req, res) => {
       });
     }
 
-    if (!email || !password || !role) {
+    if (!cleanEmail || !password || !role) {
       return res.status(400).json({
         message: "Email, password and role are required",
       });
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: cleanEmail });
     if (existingUser) {
+      // If user exists but hasn't verified yet, resend OTP instead of blocking.
+      if (
+        isEmailVerificationRequired() &&
+        existingUser.role !== "admin" &&
+        existingUser.isEmailVerified === false
+      ) {
+        const lastSentAt = existingUser.emailOtpLastSentAt
+          ? new Date(existingUser.emailOtpLastSentAt).getTime()
+          : 0;
+        if (Date.now() - lastSentAt < OTP_RESEND_COOLDOWN_MS) {
+          return res.status(429).json({
+            message: "Please wait before requesting a new code.",
+          });
+        }
+
+        const otp = await issueAndSendEmailOtp(existingUser);
+        return res.status(200).json({
+          message:
+            "Account already exists but is not verified. A new verification code was sent.",
+          ...(process.env.NODE_ENV !== "production" ? { otpDevOnly: otp } : {}),
+        });
+      }
+
       return res.status(409).json({
         message: "User already exists",
       });
@@ -139,7 +188,7 @@ exports.registerUser = async (req, res) => {
     try {
       // Create base User
       user = await User.create({
-        email,
+        email: cleanEmail,
         passwordHash,
         role,
       });
@@ -190,23 +239,7 @@ exports.registerUser = async (req, res) => {
       }
 
       // Email OTP verification (new signups)
-      const otp = generateOtp6();
-      user.isEmailVerified = false;
-      user.emailOtpHash = sha256(otp);
-      user.emailOtpExpiresAt = new Date(Date.now() + OTP_TTL_MS);
-      user.emailOtpAttempts = 0;
-      user.emailOtpLastSentAt = new Date();
-
-      // Keep old token fields cleared (backward compatible endpoint still exists)
-      user.emailVerificationTokenHash = undefined;
-      user.emailVerificationExpiresAt = undefined;
-      await user.save();
-
-      await sendEmail({
-        to: user.email,
-        subject: "Your PG Explorer verification code",
-        text: `Your verification code is: ${otp}. This code will expire in 10 minutes.`,
-      });
+      const otp = await issueAndSendEmailOtp(user);
 
       res.status(201).json({
         message: "Registration successful. Please verify your email.",
@@ -460,23 +493,7 @@ exports.resendVerificationEmail = async (req, res) => {
       });
     }
 
-    const otp = generateOtp6();
-    user.isEmailVerified = false;
-    user.emailOtpHash = sha256(otp);
-    user.emailOtpExpiresAt = new Date(Date.now() + OTP_TTL_MS);
-    user.emailOtpAttempts = 0;
-    user.emailOtpLastSentAt = new Date();
-
-    // Clear legacy token fields
-    user.emailVerificationTokenHash = undefined;
-    user.emailVerificationExpiresAt = undefined;
-    await user.save();
-
-    await sendEmail({
-      to: user.email,
-      subject: "Your PG Explorer verification code",
-      text: `Your verification code is: ${otp}. This code will expire in 10 minutes.`,
-    });
+    const otp = await issueAndSendEmailOtp(user);
 
     return res.json({
       message: "If the email exists, a verification code was sent",
