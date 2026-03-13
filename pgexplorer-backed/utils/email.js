@@ -24,10 +24,18 @@ const buildTransporter = async () => {
     port,
     secure,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
+    // Avoid requests hanging forever when SMTP is blocked by hosting provider.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
   });
 
   // verify() throws on misconfig
-  await transporter.verify();
+  try {
+    await transporter.verify();
+  } catch (err) {
+    throw new Error(`SMTP verify failed: ${err?.message || err}`);
+  }
 
   return { transporter, from: SMTP_FROM || SMTP_USER };
 };
@@ -41,13 +49,18 @@ const sendEmail = async ({ to, subject, text, html }) => {
     return { mode: "dev-log" };
   }
 
-  const info = await built.transporter.sendMail({
-    from: built.from,
-    to,
-    subject,
-    text,
-    html,
-  });
+  let info;
+  try {
+    info = await built.transporter.sendMail({
+      from: built.from,
+      to,
+      subject,
+      text,
+      html,
+    });
+  } catch (err) {
+    throw new Error(`SMTP send failed: ${err?.message || err}`);
+  }
 
   return { mode: "smtp", messageId: info.messageId };
 };

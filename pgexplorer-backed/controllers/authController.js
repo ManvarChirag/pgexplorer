@@ -226,7 +226,12 @@ exports.registerUser = async (req, res) => {
     const msg = String(error?.message || "");
     const isProd = process.env.NODE_ENV === "production";
 
-    if (isProd && msg.includes("SMTP is not configured")) {
+    if (
+      isProd &&
+      (msg.includes("SMTP is not configured") ||
+        msg.includes("SMTP verify failed") ||
+        msg.includes("SMTP send failed"))
+    ) {
       return res.status(503).json({
         message:
           "Email service is not configured. Please try again later or contact support.",
@@ -391,7 +396,12 @@ exports.resendVerificationEmail = async (req, res) => {
     const msg = String(error?.message || "");
     const isProd = process.env.NODE_ENV === "production";
 
-    if (isProd && msg.includes("SMTP is not configured")) {
+    if (
+      isProd &&
+      (msg.includes("SMTP is not configured") ||
+        msg.includes("SMTP verify failed") ||
+        msg.includes("SMTP send failed"))
+    ) {
       return res.status(503).json({
         message:
           "Email service is not configured. Please try again later or contact support.",
@@ -511,7 +521,12 @@ exports.forgotPassword = async (req, res) => {
     const msg = String(error?.message || "");
     const isProd = process.env.NODE_ENV === "production";
 
-    if (isProd && msg.includes("SMTP is not configured")) {
+    if (
+      isProd &&
+      (msg.includes("SMTP is not configured") ||
+        msg.includes("SMTP verify failed") ||
+        msg.includes("SMTP send failed"))
+    ) {
       return res.status(503).json({
         message:
           "Email service is not configured. Please try again later or contact support.",
