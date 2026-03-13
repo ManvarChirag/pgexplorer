@@ -14,7 +14,9 @@ const usage = () => {
 };
 
 const main = async () => {
-  const email = String(process.argv[2] || "").trim().toLowerCase();
+  const email = String(process.argv[2] || "")
+    .trim()
+    .toLowerCase();
   const password = String(process.argv[3] || "");
 
   if (!email || !password) {
@@ -38,7 +40,13 @@ const main = async () => {
       process.exit(2);
     }
 
-    console.log("Admin already exists:", email);
+    const salt = await bcrypt.genSalt(10);
+    existing.passwordHash = await bcrypt.hash(password, salt);
+    existing.isEmailVerified = true;
+    existing.isBlocked = false;
+    await existing.save();
+
+    console.log("Admin already exists. Password updated:", email);
     process.exit(0);
   }
 

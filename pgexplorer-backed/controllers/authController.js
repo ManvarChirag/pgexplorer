@@ -23,14 +23,19 @@ const setRefreshCookie = (res, refreshToken) => {
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
     secure: isProd,
-    sameSite: "lax",
+    // In production the frontend and backend are typically on different domains.
+    // Cross-site XHR/fetch requires SameSite=None + Secure for cookies to be sent.
+    sameSite: isProd ? "none" : "lax",
     path: "/api/auth/refresh",
     maxAge: REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000,
   });
 };
 
 const clearRefreshCookie = (res) => {
+  const isProd = process.env.NODE_ENV === "production";
   res.clearCookie("refreshToken", {
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
     path: "/api/auth/refresh",
   });
 };

@@ -278,7 +278,7 @@ exports.listBookings = async (req, res) => {
       .limit(200)
       .lean();
 
-    res.json(bookings);
+    res.json(bookings); 
   } catch (err) {
     console.error("ADMIN LIST BOOKINGS ERROR:", err);
     res.status(500).json({ message: "Server error" });

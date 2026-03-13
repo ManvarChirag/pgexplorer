@@ -22,19 +22,28 @@ if (!fs.existsSync(uploadsPath)) {
   fs.mkdirSync(uploadsPath, { recursive: true });
 }
 
-app.use(
-  cors({
-    origin: (() => {
-      const raw = process.env.FRONTEND_ORIGIN;
-      if (raw && raw.trim()) {
-        return raw
+const getAllowedOrigins = () => {
+  const devDefaults = ["http://localhost:3000", "http://localhost:3001"];
+  const raw = process.env.FRONTEND_ORIGIN;
+  const envOrigins =
+    raw && raw.trim()
+      ? raw
           .split(",")
           .map((s) => s.trim())
-          .filter(Boolean);
-      }
-      // Local dev default: CRA often runs on 3000 or 3001
-      return ["http://localhost:3000", "http://localhost:3001"];
-    })(),
+          .filter(Boolean)
+      : [];
+
+  // Always allow common local dev ports to avoid CORS "Network Error"
+  // when CRA switches between 3000/3001.
+  const merged = [...envOrigins, ...devDefaults];
+  return [...new Set(merged)];
+};
+
+const allowedOrigins = getAllowedOrigins();
+
+app.use(
+  cors({
+    origin: allowedOrigins,
     credentials: true,
   }),
 );
@@ -42,16 +51,7 @@ app.use(
 // Socket.IO for realtime chat/notifications/announcements
 const io = new Server(server, {
   cors: {
-    origin: (() => {
-      const raw = process.env.FRONTEND_ORIGIN;
-      if (raw && raw.trim()) {
-        return raw
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-      }
-      return ["http://localhost:3000", "http://localhost:3001"];
-    })(),
+    origin: allowedOrigins,
     credentials: true,
   },
 });

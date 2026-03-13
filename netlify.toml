@@ -1,0 +1,10 @@
+[build]
+  base = "pgexplorer-frontend"
+  command = "npm run build"
+  publish = "build"
+
+# SPA routing (React Router) fallback
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
