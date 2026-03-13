@@ -279,6 +279,8 @@ exports.registerUser = async (req, res) => {
         msg.includes("SMTP verify failed") ||
         msg.includes("SMTP send failed"))
     ) {
+      // Help diagnose SMTP issues via Render logs (do not include secrets).
+      console.error("[AUTH][REGISTER][SMTP_ERROR]", msg);
       return res.status(503).json({
         message:
           "Email service is not configured. Please try again later or contact support.",
@@ -509,6 +511,7 @@ exports.resendVerificationEmail = async (req, res) => {
         msg.includes("SMTP verify failed") ||
         msg.includes("SMTP send failed"))
     ) {
+      console.error("[AUTH][RESEND_OTP][SMTP_ERROR]", msg);
       return res.status(503).json({
         message:
           "Email service is not configured. Please try again later or contact support.",
@@ -634,6 +637,7 @@ exports.forgotPassword = async (req, res) => {
         msg.includes("SMTP verify failed") ||
         msg.includes("SMTP send failed"))
     ) {
+      console.error("[AUTH][FORGOT_PASSWORD][SMTP_ERROR]", msg);
       return res.status(503).json({
         message:
           "Email service is not configured. Please try again later or contact support.",
