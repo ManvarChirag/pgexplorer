@@ -2,8 +2,18 @@ import axios from "axios";
 import { updateSocketAuth } from "./socket";
 import { getUserIdFromToken } from "./jwt";
 
+const getDefaultApiBaseUrl = () => {
+  // CRA in the browser.
+  const host =
+    typeof window !== "undefined" ? String(window.location.hostname) : "";
+  const isLocal = host === "localhost" || host === "127.0.0.1";
+  return isLocal
+    ? "http://localhost:5000/api"
+    : "https://pgexplorer.onrender.com/api";
+};
+
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_BASE_URL || "http://localhost:5000/api",
+  baseURL: process.env.REACT_APP_API_BASE_URL || getDefaultApiBaseUrl(),
   withCredentials: true,
 });
 

@@ -4,8 +4,14 @@ let socket;
 let lastToken;
 
 const getSocketUrl = () => {
+  const host =
+    typeof window !== "undefined" ? String(window.location.hostname) : "";
+  const isLocal = host === "localhost" || host === "127.0.0.1";
   const base =
-    process.env.REACT_APP_API_BASE_URL || "http://localhost:5000/api";
+    process.env.REACT_APP_API_BASE_URL ||
+    (isLocal
+      ? "http://localhost:5000/api"
+      : "https://pgexplorer.onrender.com/api");
   // socket server runs on the same host but without /api
   return base.replace(/\/?api\/?$/, "");
 };
