@@ -268,8 +268,13 @@ exports.loginUser = async (req, res) => {
       return res.status(403).json({ message: "User is blocked" });
     }
 
-    // Enforce verification for new users only (existing DB users may have undefined)
-    if (user.role !== "admin" && user.isEmailVerified === false) {
+    // Enforce verification only when enabled.
+    // Existing DB users may have undefined (treated as verified).
+    if (
+      isEmailVerificationRequired() &&
+      user.role !== "admin" &&
+      user.isEmailVerified === false
+    ) {
       return res.status(403).json({
         message: "Email not verified. Please verify your email.",
       });

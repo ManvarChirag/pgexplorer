@@ -29,13 +29,6 @@ const RegisterStudent = () => {
     try {
       const res = await api.post("/auth/register", formData);
 
-      // In dev, backend returns a token so you can verify without SMTP
-      const verifyToken = res.data?.verifyTokenDevOnly;
-      if (verifyToken) {
-        navigate(`/verify-email?token=${encodeURIComponent(verifyToken)}`);
-        return;
-      }
-
       pushToast({
         type: "success",
         title: "Registration complete",

@@ -51,19 +51,28 @@ const Login = () => {
   const handleResend = async () => {
     try {
       const res = await resendVerificationEmail(form.email);
+
+      const devToken = res?.verifyTokenDevOnly;
+      if (devToken) {
+        navigate(`/verify-email?token=${encodeURIComponent(devToken)}`);
+        return;
+      }
+
       pushToast({
         type: "success",
         title: "Verification sent",
         message: res?.message || "Please check your email inbox/spam.",
       });
     } catch (err) {
+      const status = err?.response?.status;
+      const fallbackMsg =
+        status === 404
+          ? "Resend endpoint not found (404). Redeploy the backend (Render) with the latest code, then try again."
+          : "Could not resend verification email.";
       pushToast({
         type: "error",
         title: "Resend failed",
-        message:
-          err?.response?.data?.message ||
-          err?.message ||
-          "Could not resend verification email.",
+        message: err?.response?.data?.message || err?.message || fallbackMsg,
       });
     }
   };
