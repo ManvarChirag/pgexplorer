@@ -18,8 +18,14 @@ const sendViaBrevo = async ({ to, subject, text, html }) => {
     );
   }
 
-  const fromRaw = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const fromRaw =
+    process.env.EMAIL_FROM || process.env.SMTP_FROM || process.env.SMTP_USER;
   const sender = parseFrom(fromRaw);
+  if (!sender.email || !String(sender.email).includes("@")) {
+    throw new Error(
+      "Sender email is not configured. Set EMAIL_FROM (recommended) or SMTP_FROM.",
+    );
+  }
 
   const payload = {
     sender,

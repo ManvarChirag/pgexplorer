@@ -47,6 +47,9 @@ SMTP_USER=your_smtp_username
 SMTP_PASS=your_smtp_password
 SMTP_FROM="PG Explorer <no-reply@pgexplorer.com>"
 
+# If you use Brevo HTTPS API (no SMTP), set the sender address here:
+EMAIL_FROM="PG Explorer <no-reply@pgexplorer.com>"
+
 # Some hosts (including Render) may block outbound SMTP ports (587/465/25),
 # causing timeouts. In that case, configure Brevo API (HTTPS) as a fallback:
 # - Create an API key in Brevo
