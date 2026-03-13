@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   blockUser,
   listUsers,
@@ -13,22 +13,27 @@ const Users = () => {
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState("");
 
-  const load = async (nextRole = role) => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = nextRole ? await listUsersByRole(nextRole) : await listUsers();
-      setItems(res.users || res || []);
-    } catch (e) {
-      setError(e?.response?.data?.message || "Failed to load users");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const load = useCallback(
+    async (nextRole = role) => {
+      setLoading(true);
+      setError("");
+      try {
+        const res = nextRole
+          ? await listUsersByRole(nextRole)
+          : await listUsers();
+        setItems(res.users || res || []);
+      } catch (e) {
+        setError(e?.response?.data?.message || "Failed to load users");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [role],
+  );
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const setBlocked = async (id, nextBlocked) => {
     try {

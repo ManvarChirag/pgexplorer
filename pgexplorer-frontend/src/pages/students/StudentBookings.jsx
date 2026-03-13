@@ -38,7 +38,7 @@ const StudentBookings = () => {
     };
 
     fetchBookings();
-  }, []);
+  }, [pushToast]);
 
   const statusBadge = (status) => {
     if (status === "pending") return "bg-warning text-dark";

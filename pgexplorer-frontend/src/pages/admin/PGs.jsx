@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   deletePG,
   listPGs,
@@ -13,24 +13,27 @@ const PGs = () => {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("pending");
 
-  const load = async (nextStatus = status) => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = nextStatus
-        ? await listPGsByStatus(nextStatus)
-        : await listPGs();
-      setItems(res.pgs || res || []);
-    } catch (e) {
-      setError(e?.response?.data?.message || "Failed to load PGs");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const load = useCallback(
+    async (nextStatus = status) => {
+      setLoading(true);
+      setError("");
+      try {
+        const res = nextStatus
+          ? await listPGsByStatus(nextStatus)
+          : await listPGs();
+        setItems(res.pgs || res || []);
+      } catch (e) {
+        setError(e?.response?.data?.message || "Failed to load PGs");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [status],
+  );
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const updateStatus = async (id, newStatus) => {
     try {
