@@ -75,7 +75,6 @@ const Announcements = () => {
             <option value="all">All</option>
             <option value="student">Students</option>
             <option value="owner">Owners</option>
-            
           </select>
         </div>
         <div className="col-12 col-md-4">
@@ -97,7 +96,7 @@ const Announcements = () => {
           />
         </div>
         <div className="col-12 col-md-2 d-grid">
-          <button className="btn pg-btn" type="submit">
+          <button className="btn btn-primary pg-btn" type="submit">
             Publish
           </button>
         </div>
