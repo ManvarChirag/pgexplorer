@@ -9,6 +9,7 @@ const {
   listUsers,
   setUserBlocked,
   listPGs,
+  getPGPropertyPaperUrl,
   setPGStatus,
   deletePG,
   listBookings,
@@ -24,6 +25,7 @@ router.get("/users", listUsers);
 router.patch("/users/:userId/block", setUserBlocked);
 
 router.get("/pgs", listPGs);
+router.get("/pgs/:pgId/property-paper-url", getPGPropertyPaperUrl);
 router.patch("/pgs/:pgId/status", setPGStatus);
 router.delete("/pgs/:pgId", deletePG);
 

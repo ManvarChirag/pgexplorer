@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   deletePG,
+  getPGPropertyPaperUrl,
   listPGs,
   listPGsByStatus,
   setPGStatus,
@@ -51,6 +52,20 @@ const PGs = () => {
       await load();
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to delete PG");
+    }
+  };
+
+  const viewPropertyPaper = async (pg) => {
+    try {
+      const res = await getPGPropertyPaperUrl(pg._id);
+      const signedUrl = String(res?.url || "");
+      if (!signedUrl) throw new Error("Missing URL");
+      window.open(signedUrl, "_blank", "noopener,noreferrer");
+    } catch (e) {
+      setError(
+        e?.response?.data?.message ||
+          "Failed to open property paper. Please try again.",
+      );
     }
   };
 
@@ -145,14 +160,13 @@ const PGs = () => {
                       }
 
                       return (
-                        <a
+                        <button
+                          type="button"
                           className="btn btn-sm btn-outline-light pg-btn"
-                          href={url}
-                          target="_blank"
-                          rel="noreferrer"
+                          onClick={() => viewPropertyPaper(pg)}
                         >
                           View
-                        </a>
+                        </button>
                       );
                     })()}
                   </td>

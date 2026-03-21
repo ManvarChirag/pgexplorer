@@ -49,6 +49,11 @@ export const deletePG = async (id) => {
   return res.data;
 };
 
+export const getPGPropertyPaperUrl = async (id) => {
+  const res = await api.get(`/admin/pgs/${id}/property-paper-url`);
+  return res.data;
+};
+
 export const listBookings = async () => {
   const res = await api.get("/admin/bookings");
   return res.data;

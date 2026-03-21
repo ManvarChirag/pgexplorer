@@ -4,6 +4,7 @@ const Booking = require("../models/Booking");
 const Student = require("../models/Student");
 const Owner = require("../models/owner");
 const Announcement = require("../models/Announcement");
+const cloudinary = require("../utils/cloudinary");
 
 const ALLOWED_ANNOUNCEMENT_ROLES = new Set(["student", "owner", "admin"]);
 
@@ -11,7 +12,11 @@ const normalizeRoles = (value) => {
   if (!value) return [];
   const raw = Array.isArray(value) ? value : [value];
   const normalized = raw
-    .map((r) => String(r || "").trim().toLowerCase())
+    .map((r) =>
+      String(r || "")
+        .trim()
+        .toLowerCase(),
+    )
     .filter(Boolean);
   // If user explicitly sends "all", treat as broadcast to all roles.
   if (normalized.includes("all")) return [];
@@ -27,6 +32,30 @@ const normalizeRoles = (value) => {
 const safeInt = (value) => {
   const n = Number(value);
   return Number.isFinite(n) ? Math.trunc(n) : 0;
+};
+
+const isCloudinaryConfigured = () => {
+  const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET } =
+    process.env;
+  return Boolean(
+    CLOUDINARY_CLOUD_NAME &&
+    CLOUDINARY_API_KEY &&
+    CLOUDINARY_API_SECRET &&
+    [CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET].every(
+      (v) => String(v || "").trim().length > 0,
+    ),
+  );
+};
+
+const parseCloudinaryVersion = (url) => {
+  const m = String(url || "").match(/\/v(\d+)\//);
+  return m ? Number(m[1]) : undefined;
+};
+
+const looksLocalUpload = ({ url, publicId }) => {
+  const u = String(url || "");
+  const pid = String(publicId || "");
+  return pid.startsWith("local:") || u.includes("/uploads/");
 };
 
 exports.getDashboard = async (req, res) => {
@@ -188,9 +217,7 @@ exports.setUserBlocked = async (req, res) => {
     if (!target) return res.status(404).json({ message: "User not found" });
 
     if (String(target.role).toLowerCase() === "admin") {
-      return res
-        .status(403)
-        .json({ message: "Admins cannot be blocked" });
+      return res.status(403).json({ message: "Admins cannot be blocked" });
     }
 
     target.isBlocked = blocked;
@@ -224,6 +251,60 @@ exports.listPGs = async (req, res) => {
   } catch (err) {
     console.error("ADMIN LIST PGS ERROR:", err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.getPGPropertyPaperUrl = async (req, res) => {
+  try {
+    if (!isCloudinaryConfigured()) {
+      return res.status(503).json({
+        message:
+          "File storage is not configured. Configure Cloudinary to view property papers.",
+      });
+    }
+
+    const pg = await PG.findById(req.params.pgId)
+      .select("propertyPaper")
+      .lean();
+
+    if (!pg) return res.status(404).json({ message: "PG not found" });
+
+    const url = String(pg.propertyPaper?.url || "");
+    const publicId = String(pg.propertyPaper?.public_id || "");
+
+    if (!url || !publicId) {
+      return res.status(404).json({ message: "Property paper not found" });
+    }
+
+    if (looksLocalUpload({ url, publicId })) {
+      return res.status(410).json({
+        message:
+          "This property paper was uploaded using local storage and is not available in production.",
+      });
+    }
+
+    const version = parseCloudinaryVersion(url);
+    const resourceType = url.includes("/raw/upload/") ? "raw" : "image";
+    const isPdf =
+      String(pg.propertyPaper?.mimeType || "").includes("pdf") ||
+      url.toLowerCase().endsWith(".pdf") ||
+      String(pg.propertyPaper?.originalName || "")
+        .toLowerCase()
+        .endsWith(".pdf");
+
+    const signedUrl = cloudinary.url(publicId, {
+      secure: true,
+      sign_url: true,
+      type: "upload",
+      resource_type: resourceType,
+      version,
+      ...(isPdf ? { format: "pdf" } : null),
+    });
+
+    return res.json({ url: signedUrl });
+  } catch (err) {
+    console.error("ADMIN GET PROPERTY PAPER URL ERROR:", err);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -278,7 +359,7 @@ exports.listBookings = async (req, res) => {
       .limit(200)
       .lean();
 
-    res.json(bookings); 
+    res.json(bookings);
   } catch (err) {
     console.error("ADMIN LIST BOOKINGS ERROR:", err);
     res.status(500).json({ message: "Server error" });
@@ -299,7 +380,9 @@ exports.getAnnouncements = async (req, res) => {
         title: a.title || undefined,
         message: a.message,
         roles: Array.isArray(a.roles) ? a.roles : undefined,
-        createdAt: a.createdAt ? new Date(a.createdAt).toISOString() : undefined,
+        createdAt: a.createdAt
+          ? new Date(a.createdAt).toISOString()
+          : undefined,
       })),
     );
   } catch (err) {
