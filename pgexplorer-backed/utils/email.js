@@ -101,11 +101,24 @@ const buildTransporter = async () => {
   const port = Number(SMTP_PORT);
   const secure = String(SMTP_SECURE).toLowerCase() === "true";
 
+  const cleanUser = String(SMTP_USER || "")
+    .trim()
+    .replace(/^"|"$/g, "");
+  let cleanPass = String(SMTP_PASS || "")
+    .trim()
+    .replace(/^"|"$/g, "");
+
+  // Gmail "App Password" is often shown with spaces (xxxx xxxx xxxx xxxx).
+  // Strip whitespace to avoid 535 auth failures caused by copy/paste.
+  if (String(SMTP_HOST || "").includes("gmail") && /\s/.test(cleanPass)) {
+    cleanPass = cleanPass.replace(/\s+/g, "");
+  }
+
   const transporter = nodemailer.createTransport({
     host: SMTP_HOST,
     port,
     secure,
-    auth: { user: SMTP_USER, pass: SMTP_PASS },
+    auth: { user: cleanUser, pass: cleanPass },
     // Avoid requests hanging forever when SMTP is blocked by hosting provider.
     connectionTimeout: 10_000,
     greetingTimeout: 10_000,
