@@ -120,18 +120,41 @@ const PGs = () => {
                   <td>{pg.city || "-"}</td>
                   <td>{pg.ownerId?.email || "-"}</td>
                   <td>
-                    {pg.propertyPaper?.url ? (
-                      <a
-                        className="btn btn-sm btn-outline-light pg-btn"
-                        href={pg.propertyPaper.url}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        View
-                      </a>
-                    ) : (
-                      <span className="pg-muted">-</span>
-                    )}
+                    {(() => {
+                      const url = String(pg.propertyPaper?.url || "");
+                      const publicId = String(
+                        pg.propertyPaper?.public_id || "",
+                      );
+                      const isLocal =
+                        publicId.startsWith("local:") ||
+                        url.includes("/uploads/");
+
+                      if (!url) return <span className="pg-muted">-</span>;
+
+                      if (isLocal) {
+                        return (
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-light pg-btn"
+                            disabled
+                            title="This file was uploaded using local storage and is not available in production. Re-upload the PG after configuring Cloudinary."
+                          >
+                            Unavailable
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <a
+                          className="btn btn-sm btn-outline-light pg-btn"
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          View
+                        </a>
+                      );
+                    })()}
                   </td>
                   <td className="text-capitalize">{pg.status || "-"}</td>
                   <td className="d-flex gap-2 flex-wrap">

@@ -128,6 +128,16 @@ router.post(
 
       const images = [];
       const cloudEnabled = isCloudinaryConfigured();
+
+      // Render (and many PaaS) do not provide persistent local disk.
+      // Avoid saving file URLs under /uploads in production because they will 404 later.
+      if (process.env.NODE_ENV === "production" && !cloudEnabled) {
+        return res.status(503).json({
+          message:
+            "File storage is not configured. Configure Cloudinary (CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET) to upload images/property papers in production.",
+        });
+      }
+
       for (const file of imageFiles) {
         if (cloudEnabled) {
           const result = await cloudinary.uploader.upload(file.path, {
