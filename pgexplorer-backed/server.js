@@ -136,6 +136,27 @@ io.on("connection", (socket) => {
 app.use(express.json());
 app.use(cookieParser());
 
+// Simple health/config endpoint (safe: does not expose secrets)
+app.get("/api/health", (req, res) => {
+  res.json({
+    ok: true,
+    nodeEnv: process.env.NODE_ENV || null,
+    emailProvider: String(process.env.EMAIL_PROVIDER || "").toLowerCase() || null,
+    hasBrevoKey: Boolean(process.env.BREVO_API_KEY),
+    hasEmailFrom: Boolean(process.env.EMAIL_FROM),
+    hasSmtpConfig: Boolean(
+      process.env.SMTP_HOST &&
+        process.env.SMTP_PORT &&
+        process.env.SMTP_USER &&
+        process.env.SMTP_PASS,
+    ),
+    frontendOrigin: process.env.FRONTEND_ORIGIN || null,
+    renderCommit:
+      process.env.RENDER_GIT_COMMIT || process.env.COMMIT_SHA || null,
+    now: new Date().toISOString(),
+  });
+});
+
 app.use(
   helmet({
     // Allow the frontend (different origin) to load images from /uploads.
