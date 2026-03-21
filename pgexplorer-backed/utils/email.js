@@ -151,7 +151,23 @@ const sendEmail = async ({ to, subject, text, html }) => {
     return await sendViaBrevo({ to, subject, text, html });
   }
 
-  const built = await buildTransporter();
+  let built;
+  try {
+    built = await buildTransporter();
+  } catch (err) {
+    // If SMTP is blocked/misconfigured in production, fall back to Brevo API (HTTPS)
+    // when configured. This covers failures during transporter.verify().
+    if (process.env.BREVO_API_KEY) {
+      try {
+        return await sendViaBrevo({ to, subject, text, html });
+      } catch (brevoErr) {
+        throw new Error(
+          `BREVO send failed: ${brevoErr?.message || brevoErr} (after ${err?.message || err})`,
+        );
+      }
+    }
+    throw err;
+  }
 
   if (!built) {
     // In dev, we log links/tokens rather than failing registration.
