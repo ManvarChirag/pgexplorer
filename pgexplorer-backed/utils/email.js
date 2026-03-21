@@ -11,7 +11,10 @@ const parseFrom = (raw) => {
 };
 
 const sendViaBrevo = async ({ to, subject, text, html }) => {
-  const apiKey = process.env.BREVO_API_KEY;
+  const apiKey = String(process.env.BREVO_API_KEY || "")
+    .trim()
+    .replace(/^"|"$/g, "")
+    .replace(/\s+/g, "");
   if (!apiKey) {
     throw new Error(
       "BREVO_API_KEY is not configured. Set BREVO_API_KEY or configure SMTP.",
