@@ -15,6 +15,8 @@ const {
 router.post("/register", registerUser);
 router.post("/login", loginUser);
 router.post("/verify-email", verifyEmail);
+// Alias for OTP verification flow (requested route name)
+router.post("/verify-otp", verifyEmail);
 router.post("/resend-verification", resendVerificationEmail);
 router.post("/resend-otp", resendVerificationEmail);
 router.post("/refresh", refreshAccessToken);

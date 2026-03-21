@@ -39,7 +39,7 @@ export const verifyEmail = async (token) => {
 };
 
 export const verifyEmailOtp = async ({ email, otp }) => {
-  const res = await api.post("/auth/verify-email", { email, otp });
+  const res = await api.post("/auth/verify-otp", { email, otp });
   return res.data;
 };
 

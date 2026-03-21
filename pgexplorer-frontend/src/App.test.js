@@ -34,5 +34,7 @@ test("renders app shell", () => {
   expect(
     within(nav).getByRole("button", { name: /find pg/i }),
   ).toBeInTheDocument();
-  expect(within(nav).getByRole("link", { name: /login/i })).toBeInTheDocument();
+  expect(
+    within(nav).getByRole("link", { name: /log\s*in/i }),
+  ).toBeInTheDocument();
 });

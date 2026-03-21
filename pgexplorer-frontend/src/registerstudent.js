@@ -34,7 +34,7 @@ const RegisterStudent = () => {
         title: "Registration complete",
         message: res.data?.message || "Student registered successfully",
       });
-      navigate(`/verify-email?email=${encodeURIComponent(formData.email)}`);
+      navigate(`/enter-otp?email=${encodeURIComponent(formData.email)}`);
     } catch (err) {
       pushToast({
         type: "error",

@@ -61,7 +61,7 @@ const Login = () => {
         });
       }
 
-      navigate(`/verify-email?email=${encodeURIComponent(form.email)}`);
+      navigate(`/enter-otp?email=${encodeURIComponent(form.email)}`);
 
       pushToast({
         type: "success",
