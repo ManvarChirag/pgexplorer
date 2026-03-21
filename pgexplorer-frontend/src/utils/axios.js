@@ -18,7 +18,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
+  const token = sessionStorage.getItem("token");
   if (token) {
     config.headers = config.headers ?? {};
     config.headers.Authorization = `Bearer ${token}`;
@@ -38,21 +38,47 @@ api.interceptors.response.use(
       !originalRequest?.url?.includes("/auth/login") &&
       !originalRequest?.url?.includes("/auth/refresh")
     ) {
+      // Only refresh if there is an active session token.
+      // This prevents auto-login after browser/tab restart.
+      const hasSessionToken = (() => {
+        try {
+          return Boolean(sessionStorage.getItem("token"));
+        } catch {
+          return false;
+        }
+      })();
+
+      if (!hasSessionToken) {
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
       try {
         const refreshRes = await api.post("/auth/refresh");
         if (refreshRes.data?.token) {
-          localStorage.setItem("token", refreshRes.data.token);
+          sessionStorage.setItem("token", refreshRes.data.token);
           const userId = getUserIdFromToken(refreshRes.data.token);
-          if (userId) localStorage.setItem("userId", userId);
+          if (userId) sessionStorage.setItem("userId", userId);
           updateSocketAuth(refreshRes.data.token);
         }
         return api(originalRequest);
       } catch (refreshErr) {
         // Refresh failed - clear local auth
-        localStorage.removeItem("token");
-        localStorage.removeItem("role");
-        localStorage.removeItem("userId");
+        try {
+          sessionStorage.removeItem("token");
+          sessionStorage.removeItem("role");
+          sessionStorage.removeItem("userId");
+        } catch {
+          // ignore
+        }
+        // Best-effort cleanup of any legacy persistent auth.
+        try {
+          localStorage.removeItem("token");
+          localStorage.removeItem("role");
+          localStorage.removeItem("userId");
+        } catch {
+          // ignore
+        }
         updateSocketAuth(null);
         return Promise.reject(refreshErr);
       }

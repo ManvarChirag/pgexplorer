@@ -75,7 +75,7 @@ const Notifications = () => {
 
   const { pushToast } = useToast();
 
-  const role = localStorage.getItem("role");
+  const role = sessionStorage.getItem("role");
 
   useEffect(() => {
     const sync = () => setItems(readRealtimeNotifications());

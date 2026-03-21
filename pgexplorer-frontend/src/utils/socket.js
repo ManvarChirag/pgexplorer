@@ -17,7 +17,7 @@ const getSocketUrl = () => {
 };
 
 export const getSocket = () => {
-  const token = localStorage.getItem("token");
+  const token = sessionStorage.getItem("token");
 
   if (socket && lastToken === token) return socket;
 

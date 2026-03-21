@@ -19,9 +19,9 @@ const Login = () => {
 
   useEffect(() => {
     // If already logged in (e.g., after refresh), don't keep showing /login.
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
     if (!token) return;
-    const role = localStorage.getItem("role");
+    const role = sessionStorage.getItem("role");
     navigate(getRouteForRole(role), { replace: true });
   }, [navigate]);
 
@@ -30,7 +30,7 @@ const Login = () => {
     try {
       setLastError("");
       const data = await loginUser(form);
-      const role = data?.role || localStorage.getItem("role");
+      const role = data?.role || sessionStorage.getItem("role");
       navigate(getRouteForRole(role), { replace: true });
     } catch (err) {
       const msg =

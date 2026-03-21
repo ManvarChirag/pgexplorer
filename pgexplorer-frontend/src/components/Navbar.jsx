@@ -1,6 +1,6 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { resetSocket } from "../utils/socket";
+import { logout as apiLogout } from "../services/authService";
 import {
   getUnreadRealtimeNotificationsCount,
   REALTIME_NOTIFICATIONS_EVENT,
@@ -19,8 +19,8 @@ const Navbar = () => {
     getUnreadRealtimeNotificationsCount(),
   );
 
-  const token = localStorage.getItem("token");
-  const role = localStorage.getItem("role");
+  const token = sessionStorage.getItem("token");
+  const role = sessionStorage.getItem("role");
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -57,12 +57,14 @@ const Navbar = () => {
     </NavLink>
   );
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("role");
-    localStorage.removeItem("userId");
-    resetSocket();
-    navigate("/login");
+  const logout = async () => {
+    try {
+      await apiLogout();
+    } catch {
+      // ignore
+    } finally {
+      navigate("/login");
+    }
   };
 
   const closeMobileMenu = () => {

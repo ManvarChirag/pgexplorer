@@ -59,6 +59,26 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Global responsive safety nets */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+body,
+#root {
+  overflow-x: hidden;
+}
+
 body {
   background:
     radial-gradient(
@@ -343,7 +363,7 @@ html[data-theme="light"] body::after {
   border-bottom: 0;
 }
 
- .pg-kpi-row:hover {
+.pg-kpi-row:hover {
   background: rgba(255, 255, 255, 0.05);
 }
 
@@ -794,4 +814,97 @@ html[data-theme="light"] .pg-toast__close:hover {
 
 .pg-toast--info {
   border-color: rgba(28, 214, 180, 0.35);
+}
+
+/* ---------------- Responsive / Mobile UX ----------------
+   Targets: 320px, 480px, 768px, 992px breakpoints
+*/
+
+@media (max-width: 991.98px) {
+  .pg-topbar-shell {
+    flex-wrap: wrap;
+  }
+
+  .pg-topbar .navbar-toggler {
+    margin-left: auto;
+  }
+
+  .pg-topbar .navbar-collapse {
+    width: 100%;
+  }
+
+  .pg-topbar .navbar-nav {
+    width: 100%;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-top: 8px;
+  }
+
+  /* Make the collapsed menu feel like a panel */
+  .pg-topbar .navbar-collapse .navbar-nav {
+    background: rgba(6, 20, 20, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    padding: 8px;
+    backdrop-filter: blur(14px);
+  }
+}
+
+@media (max-width: 767.98px) {
+  .pg-container {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .pg-toast-stack {
+    right: 12px;
+    top: 84px;
+  }
+
+  .table-responsive {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 575.98px) {
+  /* Improve readability + reduce perceived clutter */
+  .pg-page-subtitle {
+    font-size: 0.95rem;
+  }
+
+  /* Touch-friendly buttons/links */
+  .pg-topbar-link,
+  .pg-topbar-login,
+  .pg-topbar-cta,
+  .pg-btn {
+    min-height: 42px;
+  }
+
+  .pg-topbar-link {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px !important;
+    border-radius: 12px;
+  }
+
+  /* Buttons used as nav items should stretch full width */
+  .pg-topbar .navbar-nav .btn-link {
+    width: 100%;
+    text-align: left;
+  }
+
+  /* Prevent iOS zoom on focus by keeping input font-size >= 16px */
+  .pg-form .form-control,
+  .pg-form .form-select {
+    font-size: 16px;
+  }
+
+  /* Reduce background effects cost on low-end mobile GPUs */
+  body::before {
+    opacity: 0.14;
+  }
+
+  body::after {
+    opacity: 0.06;
+  }
 }

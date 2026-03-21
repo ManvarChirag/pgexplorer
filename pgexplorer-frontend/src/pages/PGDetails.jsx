@@ -64,8 +64,8 @@ const PGDetails = () => {
     let alive = true;
     const loadFav = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const role = localStorage.getItem("role");
+        const token = sessionStorage.getItem("token");
+        const role = sessionStorage.getItem("role");
         if (!token || role !== "student") {
           if (alive) setIsFavorite(false);
           return;
@@ -102,8 +102,8 @@ const PGDetails = () => {
   if (error) return <div className="text-danger">{error}</div>;
   if (!pg) return <div className="pg-muted">PG not found.</div>;
 
-  const token = localStorage.getItem("token");
-  const role = localStorage.getItem("role");
+  const token = sessionStorage.getItem("token");
+  const role = sessionStorage.getItem("role");
 
   const isFull = Number(pg.availableRooms || 0) <= 0;
 
@@ -140,8 +140,8 @@ const PGDetails = () => {
             className={`btn pg-btn ${isFavorite ? "btn-outline-secondary" : "btn-outline-light"}`}
             onClick={async () => {
               try {
-                const token = localStorage.getItem("token");
-                const role = localStorage.getItem("role");
+                const token = sessionStorage.getItem("token");
+                const role = sessionStorage.getItem("role");
                 if (!token || role !== "student") return;
 
                 const res = await toggleFavoritePgId(id);

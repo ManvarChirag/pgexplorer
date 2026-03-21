@@ -26,7 +26,8 @@ export const getUserIdFromToken = (token) => {
 
 export const getCurrentUserId = () => {
   try {
-    const token = localStorage.getItem("token");
+    const token =
+      sessionStorage.getItem("token") || localStorage.getItem("token");
     return getUserIdFromToken(token);
   } catch {
     return null;

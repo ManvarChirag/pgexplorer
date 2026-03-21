@@ -9,10 +9,10 @@ export const registerUser = async (formData) => {
 
 export const loginUser = async (formData) => {
   const res = await api.post("/auth/login", formData);
-  localStorage.setItem("token", res.data.token);
-  localStorage.setItem("role", res.data.role);
+  sessionStorage.setItem("token", res.data.token);
+  sessionStorage.setItem("role", res.data.role);
   const userId = getUserIdFromToken(res.data.token);
-  if (userId) localStorage.setItem("userId", userId);
+  if (userId) sessionStorage.setItem("userId", userId);
 
   // Clear legacy global notification storage (now scoped per-user)
   try {
@@ -62,9 +62,18 @@ export const logout = async () => {
   try {
     await api.post("/auth/logout");
   } finally {
-    localStorage.removeItem("token");
-    localStorage.removeItem("role");
-    localStorage.removeItem("userId");
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("role");
+    sessionStorage.removeItem("userId");
+
+    // Best-effort cleanup of any legacy persistent auth.
+    try {
+      localStorage.removeItem("token");
+      localStorage.removeItem("role");
+      localStorage.removeItem("userId");
+    } catch {
+      // ignore
+    }
     try {
       window.dispatchEvent(new CustomEvent("realtimeNotifications:updated"));
     } catch {

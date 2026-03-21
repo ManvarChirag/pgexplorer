@@ -7,7 +7,7 @@ const crypto = require("crypto");
 const { sendEmail } = require("../utils/email");
 const { isValidAadhaar } = require("../utils/verhoeff");
 
-const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || "15m";
+const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || "1h";
 const REFRESH_TOKEN_DAYS = Number(process.env.REFRESH_TOKEN_DAYS || 30);
 
 const sha256 = (value) =>
@@ -59,7 +59,8 @@ const setRefreshCookie = (res, refreshToken) => {
     // Cross-site XHR/fetch requires SameSite=None + Secure for cookies to be sent.
     sameSite: isProd ? "none" : "lax",
     path: "/api/auth/refresh",
-    maxAge: REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000,
+    // Session cookie: expires when browser is closed.
+    // Do NOT set maxAge/expires to avoid persistent login.
   });
 };
 
