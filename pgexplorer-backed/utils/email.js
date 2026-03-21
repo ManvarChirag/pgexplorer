@@ -116,7 +116,15 @@ const buildTransporter = async () => {
   try {
     await transporter.verify();
   } catch (err) {
-    throw new Error(`SMTP verify failed: ${err?.message || err}`);
+    const msg = `SMTP verify failed: ${err?.message || err}`;
+    if (isProd) {
+      throw new Error(msg);
+    }
+
+    // Dev-friendly fallback: if SMTP is misconfigured, don't block registration.
+    // We'll log OTP/reset links to the console instead.
+    console.warn("[EMAIL:DEV]", msg);
+    return null;
   }
 
   return { transporter, from: SMTP_FROM || SMTP_USER };
