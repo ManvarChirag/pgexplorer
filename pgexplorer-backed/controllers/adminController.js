@@ -58,6 +58,24 @@ const looksLocalUpload = ({ url, publicId }) => {
   return pid.startsWith("local:") || u.includes("/uploads/");
 };
 
+const resolveCloudinaryResource = async (publicId) => {
+  const pid = String(publicId || "").trim();
+  if (!pid) return null;
+
+  const resourceTypes = ["raw", "image"];
+  for (const resource_type of resourceTypes) {
+    try {
+      const info = await cloudinary.api.resource(pid, {
+        resource_type,
+      });
+      return { ...info, resource_type };
+    } catch (err) {
+      // Try next resource_type
+    }
+  }
+  return null;
+};
+
 exports.getDashboard = async (req, res) => {
   try {
     const [userCounts, pgCounts, bookingCounts] = await Promise.all([
@@ -283,9 +301,26 @@ exports.getPGPropertyPaperUrl = async (req, res) => {
       });
     }
 
-    const version = parseCloudinaryVersion(url);
-    const resourceType = url.includes("/raw/upload/") ? "raw" : "image";
+    const resourceInfo = await resolveCloudinaryResource(publicId);
+    if (!resourceInfo) {
+      return res.status(404).json({ message: "Property paper not found" });
+    }
+
+    // Prefer Cloudinary's actual metadata over URL guesses.
+    const version =
+      typeof resourceInfo.version === "number"
+        ? resourceInfo.version
+        : parseCloudinaryVersion(url);
+
+    const deliveryType =
+      resourceInfo.type === "authenticated" || resourceInfo.type === "private"
+        ? resourceInfo.type
+        : resourceInfo.access_mode === "authenticated"
+          ? "authenticated"
+          : "upload";
+
     const isPdf =
+      String(resourceInfo.format || "").toLowerCase() === "pdf" ||
       String(pg.propertyPaper?.mimeType || "").includes("pdf") ||
       url.toLowerCase().endsWith(".pdf") ||
       String(pg.propertyPaper?.originalName || "")
@@ -295,13 +330,42 @@ exports.getPGPropertyPaperUrl = async (req, res) => {
     const signedUrl = cloudinary.url(publicId, {
       secure: true,
       sign_url: true,
-      type: "upload",
-      resource_type: resourceType,
+      type: deliveryType,
+      resource_type: resourceInfo.resource_type,
       version,
-      ...(isPdf ? { format: "pdf" } : null),
+      // Only apply "format" for image resources; raw resources don't use it.
+      ...(isPdf && resourceInfo.resource_type === "image"
+        ? { format: "pdf" }
+        : null),
     });
 
-    return res.json({ url: signedUrl });
+    // Fallback that works even when CDN delivery URLs are protected (401).
+    // This uses Cloudinary's signed download API endpoint.
+    const downloadFormat = String(resourceInfo.format || (isPdf ? "pdf" : ""))
+      .trim()
+      .toLowerCase();
+    const downloadUrl = cloudinary.utils.private_download_url(
+      publicId,
+      downloadFormat || "pdf",
+      {
+        resource_type: resourceInfo.resource_type,
+        type: deliveryType,
+        // 5 minutes validity window
+        expires_at: Math.floor(Date.now() / 1000) + 60 * 5,
+        attachment: false,
+      },
+    );
+
+    return res.json({
+      // Prefer the download URL because it avoids 401s caused by protected CDN URLs.
+      url: downloadUrl,
+      cdnUrl: signedUrl,
+      // Helpful for debugging (admin-only route)
+      meta: {
+        resourceType: resourceInfo.resource_type,
+        deliveryType,
+      },
+    });
   } catch (err) {
     console.error("ADMIN GET PROPERTY PAPER URL ERROR:", err);
     return res.status(500).json({ message: "Server error" });
