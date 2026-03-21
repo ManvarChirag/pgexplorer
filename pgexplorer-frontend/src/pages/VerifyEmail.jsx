@@ -32,7 +32,7 @@ const VerifyEmail = () => {
       .catch((err) => {
         setStatus(err.response?.data?.message || "Verification failed.");
       });
-  }, [searchParams, navigate]);
+  }, [token, navigate]);
 
   const submitOtp = async (e) => {
     e.preventDefault();
