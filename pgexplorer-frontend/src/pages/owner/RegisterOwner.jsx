@@ -56,6 +56,7 @@ const RegisterOwner = () => {
       name: form.name.trim(),
       email: form.email.trim(),
       password: form.password,
+      role: "owner",
       phone: form.phone.trim(),
       city: form.city.trim(),
       address: form.address.trim(),
@@ -63,19 +64,32 @@ const RegisterOwner = () => {
     };
 
     try {
-      await api.post("/owner/register", payload);
+      const res = await api.post("/auth/register", payload);
       pushToast({
         type: "success",
         title: "Registration complete",
-        message: "Owner registered successfully.",
+        message: res.data?.message || "Owner registered successfully.",
       });
-      navigate("/login");
+
+      const devOtp = res.data?.otpDevOnly;
+      if (devOtp) {
+        pushToast({
+          type: "info",
+          title: "Dev OTP",
+          message: `Your code is: ${devOtp}`,
+        });
+      }
+
+      navigate(`/enter-otp?email=${encodeURIComponent(payload.email)}`);
     } catch (err) {
       console.error("OWNER REGISTER ERROR:", err.response?.data);
+      const status = err?.response?.status;
       pushToast({
         type: "error",
         title: "Registration failed",
-        message: err.response?.data?.message || "Registration failed",
+        message: status
+          ? `[${status}] ${err.response?.data?.message || "Registration failed"}`
+          : err.response?.data?.message || "Registration failed",
       });
     }
   };

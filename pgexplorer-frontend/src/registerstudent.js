@@ -36,11 +36,20 @@ const RegisterStudent = () => {
       });
       navigate(`/enter-otp?email=${encodeURIComponent(formData.email)}`);
     } catch (err) {
+      const status = err?.response?.status;
+      const msg =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message ||
+        "Registration failed";
       pushToast({
         type: "error",
         title: "Registration failed",
-        message: err.response?.data?.message || "Registration failed",
+        message: status ? `[${status}] ${msg}` : msg,
       });
+      // Helpful during local development
+      // eslint-disable-next-line no-console
+      console.error("[REGISTER][ERROR]", err?.response?.data || err);
     }
   };
 
