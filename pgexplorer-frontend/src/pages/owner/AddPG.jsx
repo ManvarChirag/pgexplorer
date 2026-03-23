@@ -13,13 +13,9 @@ const AddPG = () => {
     gender: "",
     roomType: "single",
     ac: false,
-    deposit: "",
-    maintenance: "",
     address: "",
-    description: "",
     rules: "",
     totalRooms: "",
-    availableRooms: "",
     amenities: "",
   });
 
@@ -48,20 +44,6 @@ const AddPG = () => {
         return;
       }
 
-      const totalRooms = Math.max(0, Math.trunc(Number(form.totalRooms || 0)));
-      const availableRooms = Math.max(
-        0,
-        Math.trunc(Number(form.availableRooms || 0)),
-      );
-      if (availableRooms > totalRooms) {
-        pushToast({
-          type: "warning",
-          title: "Check room counts",
-          message: "Available rooms cannot be greater than total rooms.",
-        });
-        return;
-      }
-
       const data = new FormData();
       data.append("name", form.name);
       data.append("city", form.city);
@@ -69,13 +51,9 @@ const AddPG = () => {
       data.append("gender", form.gender);
       data.append("roomType", form.roomType);
       data.append("ac", String(form.ac));
-      data.append("deposit", form.deposit);
-      data.append("maintenance", form.maintenance);
       data.append("address", form.address);
-      data.append("description", form.description);
       data.append("rules", form.rules);
       data.append("totalRooms", form.totalRooms);
-      data.append("availableRooms", form.availableRooms);
       data.append("amenities", form.amenities);
 
       images.forEach((file) => data.append("images", file));
@@ -97,9 +75,7 @@ const AddPG = () => {
         type: "error",
         title: "Add PG failed",
         message:
-          err.response?.data?.message ||
-          err.message ||
-          "Failed to add PG",
+          err.response?.data?.message || err.message || "Failed to add PG",
       });
     }
   };
@@ -150,13 +126,61 @@ const AddPG = () => {
 
               <div className="col-12 col-md-6">
                 <label className="form-label">Gender</label>
-                <input
-                  className="form-control"
-                  placeholder="Male / Female"
-                  value={form.gender}
-                  onChange={(e) => setForm({ ...form, gender: e.target.value })}
-                  required
-                />
+                <div className="d-flex flex-wrap gap-3">
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="radio"
+                      name="gender"
+                      id="genderMale"
+                      value="male"
+                      checked={form.gender === "male"}
+                      onChange={(e) =>
+                        setForm({ ...form, gender: e.target.value })
+                      }
+                      required
+                    />
+                    <label className="form-check-label" htmlFor="genderMale">
+                      Male
+                    </label>
+                  </div>
+
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="radio"
+                      name="gender"
+                      id="genderFemale"
+                      value="female"
+                      checked={form.gender === "female"}
+                      onChange={(e) =>
+                        setForm({ ...form, gender: e.target.value })
+                      }
+                      required
+                    />
+                    <label className="form-check-label" htmlFor="genderFemale">
+                      Female
+                    </label>
+                  </div>
+
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="radio"
+                      name="gender"
+                      id="genderUnisex"
+                      value="unisex"
+                      checked={form.gender === "unisex"}
+                      onChange={(e) =>
+                        setForm({ ...form, gender: e.target.value })
+                      }
+                      required
+                    />
+                    <label className="form-check-label" htmlFor="genderUnisex">
+                      Unisex
+                    </label>
+                  </div>
+                </div>
               </div>
 
               <div className="col-12 col-md-6">
@@ -188,30 +212,6 @@ const AddPG = () => {
                 </div>
               </div>
 
-              <div className="col-12 col-md-6">
-                <label className="form-label">Deposit</label>
-                <input
-                  className="form-control"
-                  placeholder="e.g. 5000"
-                  value={form.deposit}
-                  onChange={(e) =>
-                    setForm({ ...form, deposit: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="col-12 col-md-6">
-                <label className="form-label">Maintenance</label>
-                <input
-                  className="form-control"
-                  placeholder="e.g. 500"
-                  value={form.maintenance}
-                  onChange={(e) =>
-                    setForm({ ...form, maintenance: e.target.value })
-                  }
-                />
-              </div>
-
               <div className="col-12">
                 <label className="form-label">Address</label>
                 <input
@@ -220,18 +220,6 @@ const AddPG = () => {
                   value={form.address}
                   onChange={(e) =>
                     setForm({ ...form, address: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="col-12">
-                <label className="form-label">Description</label>
-                <textarea
-                  className="form-control"
-                  rows={3}
-                  value={form.description}
-                  onChange={(e) =>
-                    setForm({ ...form, description: e.target.value })
                   }
                 />
               </div>
@@ -254,18 +242,6 @@ const AddPG = () => {
                   value={form.totalRooms}
                   onChange={(e) =>
                     setForm({ ...form, totalRooms: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="col-12 col-md-6">
-                <label className="form-label">Available Rooms</label>
-                <input
-                  className="form-control"
-                  type="number"
-                  value={form.availableRooms}
-                  onChange={(e) =>
-                    setForm({ ...form, availableRooms: e.target.value })
                   }
                 />
               </div>
@@ -295,18 +271,23 @@ const AddPG = () => {
               </div>
 
               <div className="col-12 col-md-6">
-                <label className="form-label">PG's Property Paper (Ex.Electricity bill) </label>
+                <label className="form-label">
+                  PG's Property Paper (Ex.Electricity bill){" "}
+                </label>
                 <input
                   className="form-control"
                   type="file"
                   accept="application/pdf,image/*"
                   required
                   onChange={(e) =>
-                    setPropertyPaper((e.target.files && e.target.files[0]) || null)
+                    setPropertyPaper(
+                      (e.target.files && e.target.files[0]) || null,
+                    )
                   }
                 />
                 <small className="pg-muted d-block mt-1">
-                  This PG can be removed or deactivated by admin if paper is invalid.
+                  This PG can be removed or deactivated by admin if paper is
+                  invalid.
                 </small>
               </div>
             </div>
@@ -326,13 +307,9 @@ const AddPG = () => {
                     gender: "",
                     roomType: "single",
                     ac: false,
-                    deposit: "",
-                    maintenance: "",
                     address: "",
-                    description: "",
                     rules: "",
                     totalRooms: "",
-                    availableRooms: "",
                     amenities: "",
                   });
                   setImages([]);

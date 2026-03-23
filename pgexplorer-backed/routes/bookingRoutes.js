@@ -8,6 +8,7 @@ const {
   getStudentBookings,
   getStudentBookingById,
   cancelStudentBooking,
+  downloadBookingInvoice,
 } = require("../controllers/bookingController");
 
 const protect = require("../middleware/authMiddleware");
@@ -49,6 +50,14 @@ router.put(
   protect,
   authorize("owner"),
   updateBookingStatus,
+);
+
+// Owner/Student → Download invoice PDF (approved bookings only)
+router.get(
+  "/:bookingId/invoice",
+  protect,
+  authorize("student", "owner"),
+  downloadBookingInvoice,
 );
 
 module.exports = router;

@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   cancelStudentBooking,
+  getBookingInvoicePdf,
   getStudentBookings,
 } from "../../services/bookingService";
 import { useToast } from "../../components/ToastProvider";
+import { downloadAxiosBlobResponse } from "../../utils/download";
 
 const toCamelCase = (str) =>
   str
@@ -99,6 +101,19 @@ const StudentBookings = () => {
     }
   };
 
+  const handleDownloadInvoice = async (bookingId) => {
+    try {
+      const res = await getBookingInvoicePdf(bookingId);
+      downloadAxiosBlobResponse(res, `invoice-${bookingId}.pdf`);
+    } catch (error) {
+      pushToast({
+        type: "error",
+        title: "Invoice download failed",
+        message: error.response?.data?.message || "Could not download invoice",
+      });
+    }
+  };
+
   if (loading) {
     return <div className="pg-muted">Loading bookings...</div>;
   }
@@ -173,8 +188,14 @@ const StudentBookings = () => {
               {/* Header */}
               <div className="d-flex justify-content-between align-items-start mb-3">
                 <div>
-                  <div className="h5 mb-1">{toCamelCase(booking.pg?.name)}</div>
-                  <span className="">📍 {toCamelCase(booking.pg?.city)}</span>
+                  <div className="h5 mb-1">
+                    {toCamelCase(booking.pg?.name || "PG deleted")}
+                  </div>
+                  {booking.pg?.city ? (
+                    <span>📍 {toCamelCase(booking.pg.city)}</span>
+                  ) : (
+                    <span className="pg-muted">📍 (PG removed)</span>
+                  )}
                   {booking.createdAt && (
                     <div className="pg-muted small mt-1">
                       Requested: {formatDateTime(booking.createdAt)}
@@ -190,7 +211,9 @@ const StudentBookings = () => {
               {/* Body */}
               <div className="flex-grow-1">
                 <div className="pg-muted small mb-1">Monthly Rent</div>
-                <div className="display-6 fw-semibold">₹{booking.pg?.rent}</div>
+                <div className="display-6 fw-semibold">
+                  ₹{booking.pg?.rent ?? "-"}
+                </div>
               </div>
 
               {/* Footer */}
@@ -200,14 +223,16 @@ const StudentBookings = () => {
                   <strong>{booking.status.toUpperCase()}</strong>
                 </div>
 
-                {booking.pg?._id && (
-                  <Link
-                    className="btn btn-outline-light w-100 mt-3"
-                    to={`/pg/${booking.pg._id}`}
-                  >
-                    View PG
-                  </Link>
-                )}
+                {booking.pg?._id &&
+                  !booking.pg?.isDeleted &&
+                  booking.pg?.status !== "inactive" && (
+                    <Link
+                      className="btn btn-outline-light w-100 mt-3"
+                      to={`/pg/${booking.pg._id}`}
+                    >
+                      View PG
+                    </Link>
+                  )}
 
                 <Link
                   className="btn btn-outline-light w-100 mt-2"
@@ -215,6 +240,16 @@ const StudentBookings = () => {
                 >
                   View Summary
                 </Link>
+
+                {booking.status === "approved" && (
+                  <button
+                    type="button"
+                    className="btn btn-primary w-100 mt-2"
+                    onClick={() => handleDownloadInvoice(booking._id)}
+                  >
+                    Download Invoice
+                  </button>
+                )}
 
                 {booking.status === "pending" && (
                   <button

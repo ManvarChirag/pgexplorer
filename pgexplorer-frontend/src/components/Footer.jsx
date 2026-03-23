@@ -54,7 +54,9 @@ const Footer = () => {
           <div className="col-12 col-md-6 col-lg-3">
             <div className="pg-footer-title">Contact</div>
             <ul className="pg-footer-list mt-2">
-              <li className="pg-footer-text">Email: support@pgexplorer.com</li>
+              <li className="pg-footer-text">
+                Email: pgexplorer.support@gmail.com
+              </li>
               <li className="pg-footer-text">Phone: +91 1800-456-7890</li>
             </ul>
           </div>

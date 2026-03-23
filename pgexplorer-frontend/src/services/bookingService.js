@@ -15,3 +15,9 @@ export const getStudentBookingById = (bookingId) =>
 
 export const cancelStudentBooking = (bookingId) =>
   axios.delete(`/booking/${bookingId}`);
+
+export const getBookingInvoicePdf = (bookingId) =>
+  axios.get(`/booking/${bookingId}/invoice`, {
+    responseType: "blob",
+    headers: { Accept: "application/pdf" },
+  });

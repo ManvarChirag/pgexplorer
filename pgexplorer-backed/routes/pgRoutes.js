@@ -63,6 +63,40 @@ const parseAmenities = (value) => {
     .filter(Boolean);
 };
 
+const toPlainObject = (doc) => {
+  if (!doc) return doc;
+  return typeof doc.toObject === "function" ? doc.toObject() : doc;
+};
+
+const getApprovedBookingCountsByPgId = async (pgIds) => {
+  const ids = Array.isArray(pgIds) ? pgIds.filter(Boolean) : [];
+  if (ids.length === 0) return new Map();
+
+  const rows = await Booking.aggregate([
+    { $match: { status: "approved", pg: { $in: ids } } },
+    { $group: { _id: "$pg", count: { $sum: 1 } } },
+  ]);
+
+  const map = new Map();
+  for (const row of rows) {
+    map.set(String(row._id), toNonNegativeInt(row.count));
+  }
+  return map;
+};
+
+const withComputedAvailability = (pgDocs, approvedCountByPgId) => {
+  const docs = Array.isArray(pgDocs) ? pgDocs : [pgDocs];
+  return docs.map((pgDoc) => {
+    const pg = toPlainObject(pgDoc);
+    const totalRooms = toNonNegativeInt(pg?.totalRooms);
+    const bookedRooms = toNonNegativeInt(
+      approvedCountByPgId?.get?.(String(pg?._id)) ?? 0,
+    );
+    const availableRooms = Math.max(0, totalRooms - bookedRooms);
+    return { ...pg, availableRooms };
+  });
+};
+
 const getPublicBaseUrl = (req) => {
   const configured = String(process.env.BACKEND_PUBLIC_URL || "").trim();
   if (configured) return configured.replace(/\/+$/, "");
@@ -186,7 +220,12 @@ router.post(
       }
 
       const totalRooms = toNonNegativeInt(req.body.totalRooms);
-      const availableRooms = toNonNegativeInt(req.body.availableRooms);
+      const hasAvailableRooms =
+        typeof req.body.availableRooms !== "undefined" &&
+        String(req.body.availableRooms).trim() !== "";
+      const availableRooms = hasAvailableRooms
+        ? toNonNegativeInt(req.body.availableRooms)
+        : totalRooms;
       const roomErr = validateRoomCounts({ totalRooms, availableRooms });
       if (roomErr) {
         return res.status(400).json({ message: roomErr });
@@ -402,7 +441,8 @@ router.delete("/:id", auth, async (req, res) => {
       return res.status(403).json({ message: "Not allowed" });
     }
 
-    await PG.deleteOne({ _id: pg._id });
+    // Soft-delete so existing bookings/history can still resolve PG details.
+    await PG.updateOne({ _id: pg._id }, { $set: { status: "inactive" } });
     res.json({ message: "PG deleted" });
   } catch (err) {
     console.error("PG DELETE ERROR:", err);
@@ -424,7 +464,10 @@ router.get("/search", async (req, res) => {
       limit = 10,
     } = req.query;
 
-    const filter = {};
+    const filter = {
+      // Never show soft-deleted listings in public search.
+      status: { $ne: "inactive" },
+    };
 
     if (city) filter.city = city;
     if (gender) filter.gender = gender;
@@ -464,7 +507,10 @@ router.get("/search", async (req, res) => {
       .skip(skip)
       .limit(Number(limit));
 
-    res.json(pgs);
+    const approvedCountByPgId = await getApprovedBookingCountsByPgId(
+      pgs.map((p) => p._id),
+    );
+    res.json(withComputedAvailability(pgs, approvedCountByPgId));
   } catch (err) {
     console.error("PG SEARCH ERROR:", err);
     res.status(500).json({ message: "Server error" });
@@ -487,10 +533,17 @@ router.get("/by-ids", async (req, res) => {
     const validIds = unique.filter((id) => mongoose.Types.ObjectId.isValid(id));
     if (validIds.length === 0) return res.json([]);
 
-    const pgs = await PG.find({ _id: { $in: validIds } }).sort({
+    const pgs = await PG.find({
+      _id: { $in: validIds },
+      status: { $ne: "inactive" },
+    }).sort({
       createdAt: -1,
     });
-    res.json(pgs);
+
+    const approvedCountByPgId = await getApprovedBookingCountsByPgId(
+      pgs.map((p) => p._id),
+    );
+    res.json(withComputedAvailability(pgs, approvedCountByPgId));
   } catch (err) {
     console.error("PG BY-IDS ERROR:", err);
     res.status(500).json({ message: "Server error" });
@@ -505,7 +558,13 @@ router.get("/:id", async (req, res) => {
     if (!pg) {
       return res.status(404).json({ message: "PG not found" });
     }
-    res.json(pg);
+
+    if (pg.status === "inactive") {
+      return res.status(404).json({ message: "PG not found" });
+    }
+
+    const approvedCountByPgId = await getApprovedBookingCountsByPgId([pg._id]);
+    res.json(withComputedAvailability(pg, approvedCountByPgId)[0]);
   } catch (err) {
     res.status(400).json({ message: "Invalid PG id" });
   }

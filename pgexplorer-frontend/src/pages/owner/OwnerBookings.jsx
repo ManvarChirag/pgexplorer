@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   getOwnerBookings,
+  getBookingInvoicePdf,
   updateBookingStatus,
 } from "../../services/bookingService";
 import { useToast } from "../../components/ToastProvider";
+import { downloadAxiosBlobResponse } from "../../utils/download";
 
 const OwnerBookings = () => {
   const [bookings, setBookings] = useState([]);
@@ -40,6 +42,19 @@ const OwnerBookings = () => {
         type: "error",
         title: "Update failed",
         message: "Failed to update booking.",
+      });
+    }
+  };
+
+  const handleDownloadInvoice = async (bookingId) => {
+    try {
+      const res = await getBookingInvoicePdf(bookingId);
+      downloadAxiosBlobResponse(res, `invoice-${bookingId}.pdf`);
+    } catch (error) {
+      pushToast({
+        type: "error",
+        title: "Invoice download failed",
+        message: error.response?.data?.message || "Could not download invoice",
       });
     }
   };
@@ -130,6 +145,16 @@ const OwnerBookings = () => {
                         >
                           Chat
                         </Link>
+                      )}
+
+                      {b.status === "approved" && (
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm pg-btn"
+                          onClick={() => handleDownloadInvoice(b._id)}
+                        >
+                          Download Invoice
+                        </button>
                       )}
 
                       {b.status === "pending" && (

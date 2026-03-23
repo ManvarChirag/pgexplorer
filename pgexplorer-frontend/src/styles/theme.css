@@ -447,6 +447,30 @@ html[data-theme="light"] .pg-table {
   color: var(--pg-text);
 }
 
+/*
+  Native <select> dropdown menus are largely OS/browser-controlled.
+  Setting color-scheme is the most reliable way to get a dark dropdown
+  instead of the default bright white/blue menu.
+*/
+.pg-form .form-select {
+  color-scheme: dark;
+}
+
+html[data-theme="light"] .pg-form .form-select {
+  color-scheme: light;
+}
+
+/* Best-effort option theming (works in some browsers) */
+.pg-form .form-select option {
+  background-color: var(--pg-bg-1);
+  color: var(--pg-text);
+}
+
+html[data-theme="light"] .pg-form .form-select option {
+  background-color: var(--pg-bg-0);
+  color: var(--pg-text);
+}
+
 html[data-theme="light"] .pg-form .form-control,
 html[data-theme="light"] .pg-form .form-select {
   background: rgba(255, 255, 255, 0.9);
