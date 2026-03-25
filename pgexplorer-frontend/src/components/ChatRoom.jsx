@@ -70,11 +70,7 @@ const ChatRoom = ({ pgId, studentId, header }) => {
       <div className="d-flex align-items-start justify-content-between gap-2 flex-wrap">
         <div>
           <h2 className="h4 mb-1">{header || "Chat"}</h2>
-          <div className="pg-muted">
-            {status}
-            {room ? ` • ${room}` : ""}
-          </div>
-          <div className="pg-muted small">Chat history is in-memory only.</div>
+          <div className="pg-muted small"></div>
         </div>
       </div>
 
