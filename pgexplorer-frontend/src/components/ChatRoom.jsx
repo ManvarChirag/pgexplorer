@@ -5,7 +5,7 @@ const ChatRoom = ({ pgId, studentId, header }) => {
   const [room, setRoom] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
-  const [status, setStatus] = useState("Connecting...");
+  const [, setStatus] = useState("Connecting...");
 
   const socket = useMemo(() => getSocket(), []);
   const bottomRef = useRef(null);
